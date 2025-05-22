@@ -1,0 +1,15 @@
+.pogoda-content {
+    background-color: #2D2D2D;
+    padding: 20px;
+    font-size: 14px;
+    border-radius: 10px;
+}
+
+.pogoda-content h2 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.pogoda-content p {
+    line-height: 1.5;
+}

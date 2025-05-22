@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="description" content="Mindspire - wersja robocza">
+    <meta name="keywords" content="mindspire, barastion">
+    <title>Mindspire</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="ticker-container">
+            <div class="ticker">
+                Aktualności: Bitcoin osiągnął nowy rekord ceny! | Ethereum wprowadza nowe aktualizacje | Pogoda na dziś: słonecznie, 25°C
+            </div>
+        </div>
+        <div class="login">
+            Nie jesteś zalogowany | Zaloguj / Zarejestruj
+        </div>
+    </div>
+    <div class="container">
+        <div class="logo-frame">
+            <div class="logo-inner"></div>
+        </div>
+        <nav class="nav">
+            <a href="#" class="nav-item active" data-section="strona-glowna">Strona główna</a>
+            <a href="#" class="nav-item" data-section="kryptowaluty">Kryptowaluty</a>
+            <a href="#" class="nav-item" data-section="pogoda">Pogoda</a>
+            <a href="#" class="nav-item" data-section="spolecznosc">Społeczność</a>
+        </nav>
+        <div class="content-wrapper" id="content-wrapper">
+            <div class="strona-glowna-content content">
+                <h2>Witaj na naszej stronie</h2>
+                <p>Tutaj będzie treść o tym co można znaleźć na tej stronie.</p>
+            </div>
+        </div>
+        <footer class="footer">
+            Tutaj będzie stopka (c) Mindspire
+        </footer>
+    </div>
+
+    <script>
+        // Pobieramy wszystkie zakładki i element content-wrapper
+        const navItems = document.querySelectorAll('.nav-item');
+        const contentWrapper = document.getElementById('content-wrapper');
+
+        // Domyślna zawartość dla strony głównej
+        const defaultContent = contentWrapper.innerHTML;
+
+        // Funkcja do ładowania zawartości
+        async function loadSection(section) {
+            try {
+                let contentHtml;
+                if (section === 'strona-glowna') {
+                    // Dla strony głównej używamy domyślnej zawartości
+                    contentHtml = defaultContent;
+                } else {
+                    // Ładujemy zawartość z odpowiedniego pliku HTML
+                    const response = await fetch(`${section}.html`);
+                    if (!response.ok) throw new Error('Nie udało się załadować sekcji');
+                    contentHtml = await response.text();
+                }
+
+                // Wstawiamy nową zawartość do content-wrapper
+                contentWrapper.innerHTML = contentHtml;
+
+                // Usuwamy i dodajemy odpowiednie style CSS
+                const existingStyles = document.querySelector('link[data-section-style]');
+                if (existingStyles) existingStyles.remove();
+
+                if (section !== 'strona-glowna') {
+                    const styleLink = document.createElement('link');
+                    styleLink.rel = 'stylesheet';
+                    styleLink.href = `${section}.css`;
+                    styleLink.setAttribute('data-section-style', section);
+                    document.head.appendChild(styleLink);
+                }
+
+                // Aktualizujemy klasę active
+                navItems.forEach(item => item.classList.remove('active'));
+                const activeItem = document.querySelector(`.nav-item[data-section="${section}"]`);
+                if (activeItem) activeItem.classList.add('active');
+            } catch (error) {
+                console.error('Błąd podczas ładowania sekcji:', error);
+                contentWrapper.innerHTML = '<div class="content"><h2>Błąd</h2><p>Nie udało się załadować sekcji.</p></div>';
+            }
+        }
+
+        // Obsługa kliknięć w zakładki
+        navItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const section = item.getAttribute('data-section');
+                loadSection(section);
+            });
+        });
+
+        // Załaduj domyślną sekcję przy starcie
+        loadSection('strona-glowna');
+    </script>
+</body>
+</html>
