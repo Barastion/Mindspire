@@ -5,36 +5,38 @@ on:
     branches:
       - main
 
-# Anuluj poprzednie zadania, aby uniknąć konfliktów
+# Anuluj poprzednie zadania
 concurrency:
   group: pages-${{ github.ref }}
   cancel-in-progress: true
 
-# Ustaw uprawnienia na poziomie workflow
+# Uprawnienia
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3 # Używamy starszej wersji, która może być bardziej kompatybilna
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v3 # Starsza wersja akcji
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2 # Starsza wersja akcji
-        with:
-          path: .
-
-      - name: Deploy to GitHub Pages
-        if: ${{ !env.ACT }}
-        id: deployment
-        uses: actions/deploy-pages@v2 # Starsza wersja akcji
+      - name: Checkout code
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git clone --depth=1 --branch=main "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" .
+      
+      - name: Create gh-pages branch if not exists
+        run: |
+          git checkout --orphan gh-pages || git checkout gh-pages
+          git rm -rf .
+      
+      - name: Copy files to gh-pages
+        run: |
+          cp -r ./* .
+          git add .
+          git commit -m "Deploy to gh-pages" || echo "No changes to commit"
+      
+      - name: Push to gh-pages
+        run: |
+          git push origin gh-pages --force
