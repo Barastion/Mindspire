@@ -1,12 +1,8 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import { getAnalytics } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-analytics.js';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { getDatabase, ref, set } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js';
-
-// Sprawdzenie, czy Firebase jest dostępny
-console.log('Firebase app available:', typeof initializeApp === 'function');
-console.log('Firebase auth available:', typeof getAuth === 'function');
-console.log('Firebase database available:', typeof getDatabase === 'function');
+// Sprawdzenie, czy Firebase jest dostępny globalnie
+console.log('Firebase available:', typeof firebase !== 'undefined');
+console.log('Firebase app available:', typeof firebase.initializeApp !== 'undefined');
+console.log('Firebase auth available:', typeof firebase.auth !== 'undefined');
+console.log('Firebase database available:', typeof firebase.database !== 'undefined');
 
 // Konfiguracja Firebase
 const firebaseConfig = {
@@ -21,10 +17,10 @@ const firebaseConfig = {
 };
 
 // Inicjalizacja Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-const auth = getAuth(app);
-const db = getDatabase(app);
+const app = firebase.initializeApp(firebaseConfig);
+const analytics = firebase.analytics(app);
+const auth = firebase.auth(app);
+const db = firebase.database(app);
 
 console.log('Firebase app initialized:', app);
 console.log('Auth initialized:', auth);
@@ -33,13 +29,13 @@ console.log('Database initialized:', db);
 // Funkcja do logowania przez Google
 async function signInWithGoogle() {
   try {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const result = await auth.signInWithPopup(provider);
     const user = result.user;
     console.log('Zalogowano przez Google:', user);
 
     // Zapis danych użytkownika do bazy danych
-    await set(ref(db, 'users/' + user.uid), {
+    await db.ref('users/' + user.uid).set({
       username: user.displayName,
       email: user.email,
       lastLogin: new Date().toISOString()
@@ -102,7 +98,7 @@ function updateLoginSection(user) {
     const authLink = document.getElementById('authLink');
     authLink.addEventListener('click', () => {
       console.log('Logout link clicked');
-      signOut(auth).then(() => {
+      auth.signOut().then(() => {
         console.log('Wylogowano pomyślnie');
       }).catch((error) => {
         console.error('Błąd wylogowania:', error);
@@ -119,7 +115,7 @@ function updateLoginSection(user) {
 }
 
 // Obsługa stanu zalogowania
-onAuthStateChanged(auth, (user) => {
+auth.onAuthStateChanged((user) => {
   console.log('Auth state changed:', user);
   updateLoginSection(user);
 });
