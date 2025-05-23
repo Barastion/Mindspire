@@ -21,23 +21,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main branch
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git clone --depth=1 --branch=main "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" main_branch
-          cd main_branch
-      
+        uses: actions/checkout@v3
+        with:
+          ref: main
+
       - name: Create or switch to gh-pages branch
         run: |
           git checkout --orphan gh-pages || git checkout gh-pages
           git rm -rf .
-      
+
       - name: Copy files from main to gh-pages
         run: |
-          cp -r ../main_branch/* .
+          git checkout main -- .
+          git reset
+
+      - name: Commit and push to gh-pages
+        run: |
           git add .
           git commit -m "Deploy to gh-pages from main" || echo "No changes to commit"
-      
-      - name: Push to gh-pages
-        run: |
           git push origin gh-pages --force
