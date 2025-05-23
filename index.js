@@ -125,7 +125,7 @@ function updateLoginSection(user) {
 let wasLoggedIn = false;
 onAuthStateChanged(auth, (user) => {
   if (!user && wasLoggedIn) {
-    console.log('User logged out successfully');
+    console.log('Wylogowano pomyślnie');
     alert('Wylogowano pomyślnie!');
   }
   wasLoggedIn = !!user;
