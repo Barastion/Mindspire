@@ -6,7 +6,7 @@ import { getDatabase, ref, set } from 'https://www.gstatic.com/firebasejs/10.14.
 // Sprawdzenie, czy moduły Firebase są dostępne
 console.log('Firebase app module available:', typeof initializeApp === 'function');
 console.log('Firebase auth module available:', typeof getAuth === 'function');
-console.log('Firebase database module available:', typeof getDatabase === 'function');
+console.log('Firebase database available:', typeof getDatabase === 'function');
 
 // Konfiguracja Firebase
 const firebaseConfig = {
@@ -111,8 +111,10 @@ function updateLoginSection(user) {
       console.log('Logout link clicked');
       signOut(auth).then(() => {
         console.log('Wylogowano pomyślnie');
+        alert('Wylogowano pomyślnie!');
       }).catch((error) => {
         console.error('Błąd wylogowania:', error);
+        alert('Błąd wylogowania: ' + error.message);
       });
     });
   } else {
