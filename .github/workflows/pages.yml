@@ -5,47 +5,41 @@ on:
     branches:
       - main
 
-# Anuluj poprzednie zadania
+# Anuluj poprzednie zadania, aby uniknąć konfliktów
 concurrency:
   group: pages-${{ github.ref }}
   cancel-in-progress: true
 
-# Uprawnienia
+# Ustaw uprawnienia na poziomie workflow
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    # Ustaw uprawnienia na poziomie zadania (dla pewności)
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout main branch
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          ref: main
+          path: .
 
-      - name: Set Git identity
-        run: |
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions"
-
-      - name: Create or switch to gh-pages branch
-        run: |
-          if git show-ref --quiet refs/heads/gh-pages; then
-            git checkout gh-pages
-          else
-            git checkout --orphan gh-pages
-          fi
-          git rm -rf .
-
-      - name: Copy files from main to gh-pages
-        run: |
-          git checkout main -- .
-          git reset
-
-      - name: Commit and push to gh-pages
-        run: |
-          git add .
-          git commit -m "Deploy to gh-pages from main" || echo "No changes to commit"
-          git push origin gh-pages --force
+      - name: Deploy to GitHub Pages
+        if: ${{ !env.ACT }} # Pomijaj ten krok podczas testów lokalnych z 'act'
+        id: deployment
+        uses: actions/deploy-pages@v4
