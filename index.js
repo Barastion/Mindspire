@@ -30,7 +30,7 @@ function showLoginPanel() {
 
   const loginPanel = document.createElement('div');
   loginPanel.id = 'loginPanel';
- Runtime Revolution style.position = 'fixed';
+  loginPanel.style.position = 'fixed';
   loginPanel.style.top = '50%';
   loginPanel.style.left = '50%';
   loginPanel.style.transform = 'translate(-50%, -50%)';
@@ -62,8 +62,9 @@ function showLoginPanel() {
 function updateLoginSection(user) {
   const loginDiv = document.querySelector('.login');
   if (user) {
-    loginDiv.innerHTML = `Witaj, ${user.displayName} | <button id="signOutButton">Wyloguj</button>`;
-    document.getElementById('signOutButton').addEventListener('click', () => {
+    loginDiv.innerHTML = `Witaj, ${user.displayName} | <span id="authLink" style="cursor: pointer;">Wyloguj</span>`;
+    const authLink = document.getElementById('authLink');
+    authLink.addEventListener('click', () => {
       signOut(auth).then(() => {
         console.log('Wylogowano pomyślnie');
       }).catch((error) => {
@@ -71,13 +72,11 @@ function updateLoginSection(user) {
       });
     });
   } else {
-    loginDiv.innerHTML = 'Nie jesteś zalogowany | <span id="loginLink" style="cursor: pointer;">Zaloguj / Zarejestruj</span>';
-    document.getElementById('loginLink').addEventListener('click', showLoginPanel);
+    loginDiv.innerHTML = 'Nie jesteś zalogowany | <span id="authLink" style="cursor: pointer;">Zaloguj / Zarejestruj</span>';
+    const authLink = document.getElementById('authLink');
+    authLink.addEventListener('click', showLoginPanel);
   }
 }
-
-// Obsługa kliknięcia w link "Zaloguj / Zarejestruj"
-document.getElementById('loginLink').addEventListener('click', showLoginPanel);
 
 // Obsługa stanu zalogowania
 onAuthStateChanged(auth, (user) => {
@@ -85,4 +84,6 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // Inicjalizacja: ustawienie początkowego stanu
-updateLoginSection(auth.currentUser);
+document.addEventListener('DOMContentLoaded', () => {
+  updateLoginSection(auth.currentUser);
+});
