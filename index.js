@@ -3,12 +3,12 @@ import { getAnalytics } from 'https://www.gstatic.com/firebasejs/10.14.1/firebas
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { getDatabase, ref, set } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js';
 
-// Sprawdzenie, czy moduły Firebase są dostępne
+// Inicjalizacja Firebase z grupowaniem logów
+console.groupCollapsed("Inicjalizacja Firebase");
 console.log('Firebase app module available:', typeof initializeApp === 'function');
 console.log('Firebase auth module available:', typeof getAuth === 'function');
 console.log('Firebase database available:', typeof getDatabase === 'function');
 
-// Konfiguracja Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyCeJVS7qR3lOYusK32jqdxwMrEkJ0yU8P0",
   authDomain: "mindspire-2b5b4.firebaseapp.com",
@@ -20,7 +20,6 @@ const firebaseConfig = {
   measurementId: "G-HFZ8T97V5Y"
 };
 
-// Inicjalizacja Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
@@ -29,9 +28,12 @@ const db = getDatabase(app);
 console.log('Firebase app initialized:', app);
 console.log('Auth initialized:', auth);
 console.log('Database initialized:', db);
+console.groupEnd();
+console.log("Pomyślnie zalogowano do Firebase");
 
-// Funkcja do logowania przez Google
+// Funkcja do logowania przez Google z grupowaniem logów
 async function signInWithGoogle() {
+  console.groupCollapsed("Logowanie");
   try {
     console.log('Starting Google sign-in process');
     const provider = new GoogleAuthProvider();
@@ -39,7 +41,6 @@ async function signInWithGoogle() {
     const user = result.user;
     console.log('Zalogowano przez Google:', user);
 
-    // Przygotowanie danych do zapisu
     const userData = {
       username: user.displayName,
       email: user.email,
@@ -48,23 +49,23 @@ async function signInWithGoogle() {
     const userRef = ref(db, 'users/' + user.uid);
     console.log('Attempting to write user data to:', userRef.toString(), 'with data:', userData);
 
-    // Zapis danych użytkownika do bazy danych
     await set(userRef, userData);
     console.log('Dane użytkownika zapisano pomyślnie');
-    alert('Zalogowano pomyślnie! Dane zapisano w bazie.');
   } catch (error) {
     console.error('Błąd logowania:', error.code, error.message);
+    console.groupEnd();
+    console.log("Niepomyślnie zalogowano");
     alert('Błąd logowania: ' + error.message);
+    return;
   }
+  console.groupEnd();
+  console.log("Pomyślnie zalogowano");
+  alert('Zalogowano pomyślnie! Dane zapisano w bazie.');
 }
 
 // Funkcja do wyświetlania panelu logowania
 function showLoginPanel() {
-  console.log('showLoginPanel called');
-  if (document.getElementById('loginPanel')) {
-    console.log('Login panel already exists');
-    return;
-  }
+  if (document.getElementById('loginPanel')) return;
 
   const loginPanel = document.createElement('div');
   loginPanel.id = 'loginPanel';
@@ -84,70 +85,58 @@ function showLoginPanel() {
     <button id="closePanelButton">Zamknij</button>
   `;
   document.body.appendChild(loginPanel);
-  console.log('Login panel appended to body');
 
   document.getElementById('googleSignInButton').addEventListener('click', () => {
-    console.log('Google sign-in button clicked');
     signInWithGoogle();
     document.body.removeChild(loginPanel);
   });
 
   document.getElementById('closePanelButton').addEventListener('click', () => {
-    console.log('Close panel button clicked');
     document.body.removeChild(loginPanel);
   });
 }
 
 // Funkcja do aktualizacji sekcji logowania
 function updateLoginSection(user) {
-  console.log('updateLoginSection called with user:', user);
   const loginDiv = document.querySelector('.login');
-  if (!loginDiv) {
-    console.error('Login div not found');
-    return;
-  }
+  if (!loginDiv) return;
 
   if (user) {
     loginDiv.innerHTML = `Witaj, ${user.displayName} | <span id="authLink" style="cursor: pointer;">Wyloguj</span>`;
     const authLink = document.getElementById('authLink');
-    if (authLink) {
-      // Usuwamy wszystkie istniejące listenery
-      authLink.replaceWith(authLink.cloneNode(true));
-      const newAuthLink = document.getElementById('authLink');
-      newAuthLink.addEventListener('click', () => {
-        console.log('Logout link clicked');
-        signOut(auth).then(() => {
-          console.log('signOut promise resolved');
-        }).catch((error) => {
-          console.error('Błąd wylogowania:', error.code, error.message);
-          alert('Błąd wylogowania: ' + error.message);
-        });
-      });
-      console.log('Logout link listener added');
-    } else {
-      console.error('authLink not found after setting loginDiv innerHTML');
-    }
+    authLink.replaceWith(authLink.cloneNode(true));
+    const newAuthLink = document.getElementById('authLink');
+    newAuthLink.addEventListener('click', handleLogout);
   } else {
     loginDiv.innerHTML = 'Nie jesteś zalogowany | <span id="authLink" style="cursor: pointer;">Zaloguj / Zarejestruj</span>';
     const authLink = document.getElementById('authLink');
-    if (authLink) {
-      authLink.replaceWith(authLink.cloneNode(true));
-      const newAuthLink = document.getElementById('authLink');
-      newAuthLink.addEventListener('click', () => {
-        console.log('Auth link clicked');
-        showLoginPanel();
-      });
-      console.log('Login link listener added');
-    }
+    authLink.replaceWith(authLink.cloneNode(true));
+    const newAuthLink = document.getElementById('authLink');
+    newAuthLink.addEventListener('click', showLoginPanel);
   }
+}
+
+// Funkcja do wylogowania z grupowaniem logów
+function handleLogout() {
+  console.groupCollapsed("Wylogowanie");
+  signOut(auth)
+    .then(() => {
+      console.log('signOut promise resolved');
+      console.groupEnd();
+      console.log("Pomyślnie wylogowano");
+    })
+    .catch((error) => {
+      console.error('Błąd wylogowania:', error.code, error.message);
+      console.groupEnd();
+      console.log("Niepomyślnie wylogowano");
+      alert('Błąd wylogowania: ' + error.message);
+    });
 }
 
 // Obsługa stanu zalogowania z komunikatem wylogowania
 let wasLoggedIn = false;
 onAuthStateChanged(auth, (user) => {
-  console.log('Auth state changed:', user);
   if (!user && wasLoggedIn) {
-    console.log('User logged out, showing alert');
     alert('Wylogowano pomyślnie!');
   }
   wasLoggedIn = !!user;
@@ -156,6 +145,5 @@ onAuthStateChanged(auth, (user) => {
 
 // Inicjalizacja: ustawienie początkowego stanu
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOM content loaded');
   updateLoginSection(auth.currentUser);
 });
