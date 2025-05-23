@@ -2,6 +2,9 @@ import { auth, db } from './firebase';
 import { ref, set } from 'firebase/database';
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
 
+// Sprawdzenie, czy Firebase się zaimportował
+console.log('Firebase app imported:', initializeApp);
+
 // Funkcja do logowania przez Google
 async function signInWithGoogle() {
   try {
@@ -25,8 +28,11 @@ async function signInWithGoogle() {
 
 // Funkcja do wyświetlania panelu logowania
 function showLoginPanel() {
-  // Sprawdzamy, czy panel już istnieje, aby uniknąć duplikatów
-  if (document.getElementById('loginPanel')) return;
+  console.log('showLoginPanel called');
+  if (document.getElementById('loginPanel')) {
+    console.log('Login panel already exists');
+    return;
+  }
 
   const loginPanel = document.createElement('div');
   loginPanel.id = 'loginPanel';
@@ -39,12 +45,14 @@ function showLoginPanel() {
   loginPanel.style.borderRadius = '10px';
   loginPanel.style.zIndex = '1001';
   loginPanel.style.color = '#FFFFFF';
+  loginPanel.style.border = '2px solid red'; // Dodane dla debugowania
   loginPanel.innerHTML = `
     <h3>Logowanie</h3>
     <button id="googleSignInButton">Zaloguj przez Google</button>
     <button id="closePanelButton">Zamknij</button>
   `;
   document.body.appendChild(loginPanel);
+  console.log('Login panel appended to body');
 
   // Obsługa przycisku logowania przez Google
   document.getElementById('googleSignInButton').addEventListener('click', () => {
@@ -65,6 +73,7 @@ function updateLoginSection(user) {
     loginDiv.innerHTML = `Witaj, ${user.displayName} | <span id="authLink" style="cursor: pointer;">Wyloguj</span>`;
     const authLink = document.getElementById('authLink');
     authLink.addEventListener('click', () => {
+      console.log('Logout link clicked');
       signOut(auth).then(() => {
         console.log('Wylogowano pomyślnie');
       }).catch((error) => {
@@ -74,16 +83,25 @@ function updateLoginSection(user) {
   } else {
     loginDiv.innerHTML = 'Nie jesteś zalogowany | <span id="authLink" style="cursor: pointer;">Zaloguj / Zarejestruj</span>';
     const authLink = document.getElementById('authLink');
-    authLink.addEventListener('click', showLoginPanel);
+    authLink.addEventListener('click', () => {
+      console.log('Auth link clicked');
+      showLoginPanel();
+    });
   }
 }
 
 // Obsługa stanu zalogowania
 onAuthStateChanged(auth, (user) => {
+  console.log('Auth state changed:', user);
   updateLoginSection(user);
 });
 
 // Inicjalizacja: ustawienie początkowego stanu
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOM content loaded');
   updateLoginSection(auth.currentUser);
 });
+
+// Sprawdzenie inicjalizacji Firebase
+console.log('Firebase initialized successfully');
+console.log('Auth object:', auth);
