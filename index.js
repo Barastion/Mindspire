@@ -25,9 +25,12 @@ async function signInWithGoogle() {
 
 // Funkcja do wyświetlania panelu logowania
 function showLoginPanel() {
+  // Sprawdzamy, czy panel już istnieje, aby uniknąć duplikatów
+  if (document.getElementById('loginPanel')) return;
+
   const loginPanel = document.createElement('div');
   loginPanel.id = 'loginPanel';
-  loginPanel.style.position = 'fixed';
+ Runtime Revolution style.position = 'fixed';
   loginPanel.style.top = '50%';
   loginPanel.style.left = '50%';
   loginPanel.style.transform = 'translate(-50%, -50%)';
@@ -55,19 +58,31 @@ function showLoginPanel() {
   });
 }
 
-// Obsługa kliknięcia w link "Zaloguj / Zarejestruj"
-document.getElementById('loginLink').addEventListener('click', showLoginPanel);
-
-// Obsługa stanu zalogowania
-onAuthStateChanged(auth, (user) => {
+// Funkcja do aktualizacji sekcji logowania
+function updateLoginSection(user) {
   const loginDiv = document.querySelector('.login');
   if (user) {
     loginDiv.innerHTML = `Witaj, ${user.displayName} | <button id="signOutButton">Wyloguj</button>`;
     document.getElementById('signOutButton').addEventListener('click', () => {
-      signOut(auth);
+      signOut(auth).then(() => {
+        console.log('Wylogowano pomyślnie');
+      }).catch((error) => {
+        console.error('Błąd wylogowania:', error);
+      });
     });
   } else {
     loginDiv.innerHTML = 'Nie jesteś zalogowany | <span id="loginLink" style="cursor: pointer;">Zaloguj / Zarejestruj</span>';
     document.getElementById('loginLink').addEventListener('click', showLoginPanel);
   }
+}
+
+// Obsługa kliknięcia w link "Zaloguj / Zarejestruj"
+document.getElementById('loginLink').addEventListener('click', showLoginPanel);
+
+// Obsługa stanu zalogowania
+onAuthStateChanged(auth, (user) => {
+  updateLoginSection(user);
 });
+
+// Inicjalizacja: ustawienie początkowego stanu
+updateLoginSection(auth.currentUser);
