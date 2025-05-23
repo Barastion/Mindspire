@@ -33,20 +33,27 @@ console.log('Database initialized:', db);
 // Funkcja do logowania przez Google
 async function signInWithGoogle() {
   try {
+    console.log('Starting Google sign-in process');
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
     const user = result.user;
     console.log('Zalogowano przez Google:', user);
 
-    // Zapis danych użytkownika do bazy danych
-    await set(ref(db, 'users/' + user.uid), {
+    // Przygotowanie danych do zapisu
+    const userData = {
       username: user.displayName,
       email: user.email,
       lastLogin: new Date().toISOString()
-    });
+    };
+    const userRef = ref(db, 'users/' + user.uid);
+    console.log('Attempting to write user data to:', userRef.toString(), 'with data:', userData);
+
+    // Zapis danych użytkownika do bazy danych
+    await set(userRef, userData);
+    console.log('Dane użytkownika zapisano pomyślnie');
     alert('Zalogowano pomyślnie! Dane zapisano w bazie.');
   } catch (error) {
-    console.error('Błąd logowania:', error.message);
+    console.error('Błąd logowania:', error.code, error.message);
     alert('Błąd logowania: ' + error.message);
   }
 }
