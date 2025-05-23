@@ -79,6 +79,16 @@ body {
     background-color: #3A3A3A;
 }
 
+/* Dodany styl dla #authLink */
+#authLink {
+    text-decoration: none; /* Bez podkreślenia domyślnie */
+    color: #E0D859;
+}
+
+#authLink:hover {
+    text-decoration: underline; /* Podkreślenie przy najechaniu */
+}
+
 .container {
     width: 960px;
     max-width: 94%;
