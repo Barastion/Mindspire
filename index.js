@@ -1,7 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
 import { getAnalytics } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { getDatabase, ref, set } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
+import { getDatabase, ref, set, get, query, orderByChild, equalTo } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
 
 // Inicjalizacja Firebase z grupowaniem logów
 console.groupCollapsed("Inicjalizacja Firebase");
@@ -41,16 +41,16 @@ async function signInWithGoogle() {
     const user = result.user;
     console.log('Zalogowano przez Google:', user);
 
-    const userData = {
-      username: user.displayName,
-      email: user.email,
-      lastLogin: new Date().toISOString()
-    };
+    // Sprawdź, czy użytkownik ma już wybrany username
     const userRef = ref(db, 'users/' + user.uid);
-    console.log('Attempting to write user data to:', userRef.toString(), 'with data:', userData);
-
-    await set(userRef, userData);
-    console.log('Dane użytkownika zapisano pomyślnie');
+    const userSnapshot = await get(userRef);
+    if (!userSnapshot.exists() || !userSnapshot.val().customUsername) {
+      console.log('Użytkownik nie ma wybranego username, wyświetl modal');
+      showUsernameModal(user);
+    } else {
+      console.log('Użytkownik ma już username, aktualizuj lastLogin');
+      await set(ref(db, 'users/' + user.uid + '/lastLogin'), new Date().toISOString());
+    }
   } catch (error) {
     console.error('Błąd logowania:', error.code, error.message);
     console.groupEnd();
@@ -60,7 +60,67 @@ async function signInWithGoogle() {
   }
   console.groupEnd();
   console.log("Pomyślnie zalogowano");
-  alert('Zalogowano pomyślnie! Dane zapisano w bazie.');
+}
+
+// Funkcja do wyświetlania modala wyboru username
+function showUsernameModal(user) {
+  const modal = document.getElementById('usernameModal');
+  const input = document.getElementById('usernameInput');
+  const error = document.getElementById('usernameError');
+  const submitButton = document.getElementById('submitUsernameButton');
+
+  modal.style.display = 'block';
+  input.value = '';
+  error.style.display = 'none';
+
+  submitButton.onclick = async () => {
+    const username = input.value.trim();
+    // Walidacja username
+    if (username.length < 3) {
+      error.textContent = 'Username musi mieć co najmniej 3 znaki.';
+      error.style.display = 'block';
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      error.textContent = 'Username może zawierać tylko litery, cyfry i podkreślniki.';
+      error.style.display = 'block';
+      return;
+    }
+
+    // Sprawdź unikalność username
+    console.groupCollapsed("Sprawdzanie unikalności username");
+    const usernamesRef = ref(db, 'usernames');
+    const queryRef = query(usernamesRef, orderByChild('username'), equalTo(username));
+    const snapshot = await get(queryRef);
+    if (snapshot.exists()) {
+      console.log('Username już zajęty:', username);
+      console.groupEnd();
+      error.textContent = 'Ten username jest już zajęty.';
+      error.style.display = 'block';
+      return;
+    }
+    console.log('Username dostępny:', username);
+    console.groupEnd();
+
+    // Zapisz dane użytkownika
+    console.groupCollapsed("Zapis username");
+    const userRef = ref(db, 'users/' + user.uid);
+    const userData = {
+      customUsername: username,
+      email: user.email,
+      lastLogin: new Date().toISOString()
+    };
+    await set(userRef, userData);
+    console.log('Zapisano dane użytkownika:', userData);
+
+    // Zapisz username w /usernames dla unikalności
+    await set(ref(db, 'usernames/' + user.uid), { username: username });
+    console.log('Zapisano username w /usernames');
+    console.groupEnd();
+
+    modal.style.display = 'none';
+    alert('Username został zapisany!');
+  };
 }
 
 // Funkcja do wyświetlania panelu logowania
@@ -102,11 +162,23 @@ function updateLoginSection(user) {
   if (!loginDiv) return;
 
   if (user) {
-    loginDiv.innerHTML = `Witaj, ${user.displayName} | <span id="authLink" style="cursor: pointer;">Wyloguj</span>`;
-    const authLink = document.getElementById('authLink');
-    authLink.replaceWith(authLink.cloneNode(true));
-    const newAuthLink = document.getElementById('authLink');
-    newAuthLink.addEventListener('click', handleLogout);
+    // Pobierz customUsername z bazy danych
+    const userRef = ref(db, 'users/' + user.uid);
+    get(userRef).then((snapshot) => {
+      if (snapshot.exists()) {
+        const userData = snapshot.val();
+        const displayName = userData.customUsername || 'Użytkownik';
+        loginDiv.innerHTML = `Witaj, ${displayName} | <span id="authLink" style="cursor: pointer;">Wyloguj</span>`;
+      } else {
+        loginDiv.innerHTML = `Witaj, Użytkownik | <span id="authLink" style="cursor: pointer;">Wyloguj</span>`;
+      }
+      const authLink = document.getElementById('authLink');
+      authLink.replaceWith(authLink.cloneNode(true));
+      const newAuthLink = document.getElementById('authLink');
+      newAuthLink.addEventListener('click', handleLogout);
+    }).catch((error) => {
+      console.error('Błąd pobierania danych użytkownika:', error);
+    });
   } else {
     loginDiv.innerHTML = 'Nie jesteś zalogowany | <span id="authLink" style="cursor: pointer;">Zaloguj / Zarejestruj</span>';
     const authLink = document.getElementById('authLink');
