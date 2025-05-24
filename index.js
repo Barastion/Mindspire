@@ -31,20 +31,13 @@ console.log('Database initialized:', db);
 console.groupEnd();
 console.log("Pomyślnie zalogowano do Firebase");
 
-// Funkcja do logowania przez Google z grupowaniem logów i znacznikami czasu
+// Funkcja do logowania przez Google z grupowaniem logów
 async function signInWithGoogle() {
-  const loadingElement = document.getElementById('loading');
-  loadingElement.style.display = 'block';
-
   console.groupCollapsed("Logowanie");
-  const startTime = new Date().toISOString();
-  console.log('Starting Google sign-in process at', startTime);
-
   try {
+    console.log('Starting Google sign-in process');
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
-    const popupResolvedTime = new Date().toISOString();
-    console.log('Popup resolved at', popupResolvedTime);
     const user = result.user;
     console.log('Zalogowano przez Google:', user);
 
@@ -57,15 +50,13 @@ async function signInWithGoogle() {
     console.log('Attempting to write user data to:', userRef.toString(), 'with data:', userData);
 
     await set(userRef, userData);
-    console.log('Dane użytkownika zapisano pomyślnie at', new Date().toISOString());
+    console.log('Dane użytkownika zapisano pomyślnie');
   } catch (error) {
     console.error('Błąd logowania:', error.code, error.message);
     console.groupEnd();
     console.log("Niepomyślnie zalogowano");
     alert('Błąd logowania: ' + error.message);
     return;
-  } finally {
-    loadingElement.style.display = 'none';
   }
   console.groupEnd();
   console.log("Pomyślnie zalogowano");
