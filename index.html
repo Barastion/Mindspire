@@ -8,10 +8,10 @@
     <title>Mindspire</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="favicon.ico" type="image/x-icon">
-    <!-- Preconnect do przyspieszenia połączenia z Google -->
+    <!-- Preconnect dla przyspieszenia połączenia z Google -->
     <link rel="preconnect" href="https://accounts.google.com">
     <link rel="preconnect" href="https://www.gstatic.com">
-    <!-- Firebase CDN scripts - zaktualizowana wersja (sprawdź najnowszą!) -->
+    <!-- Firebase CDN scripts - zaktualizowana wersja -->
     <script type="module" src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js"></script>
     <script type="module" src="https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics.js"></script>
     <script type="module" src="https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js"></script>
@@ -49,11 +49,6 @@
         </footer>
     </div>
 
-    <!-- Wskaźnik ładowania -->
-    <div id="loading" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); color: white; padding: 10px 20px; border-radius: 5px; z-index: 1002;">
-        Trwa logowanie...
-    </div>
-
     <script type="module" defer src="index.js"></script>
 
     <script>
@@ -69,14 +64,19 @@
             try {
                 let contentHtml;
                 if (section === 'strona-glowna') {
+                    // Dla strony głównej używamy domyślnej zawartości
                     contentHtml = defaultContent;
                 } else {
+                    // Ładujemy zawartość z odpowiedniego pliku HTML
                     const response = await fetch(`${section}.html`);
                     if (!response.ok) throw new Error('Nie udało się załadować sekcji');
                     contentHtml = await response.text();
                 }
+
+                // Wstawiamy nową zawartość do content-wrapper
                 contentWrapper.innerHTML = contentHtml;
 
+                // Usuwamy i dodajemy odpowiednie style CSS
                 const existingStyles = document.querySelector('link[data-section-style]');
                 if (existingStyles) existingStyles.remove();
 
@@ -88,6 +88,7 @@
                     document.head.appendChild(styleLink);
                 }
 
+                // Aktualizujemy klasę active
                 navItems.forEach(item => item.classList.remove('active'));
                 const activeItem = document.querySelector(`.nav-item[data-section="${section}"]`);
                 if (activeItem) activeItem.classList.add('active');
