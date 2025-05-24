@@ -119,8 +119,8 @@ function showUsernameModal(user) {
       }
       console.log('Username dostępny:', username);
     } catch (error) {
-      console.error('Błąd podczas sprawdzania unikalności username:', error);
-      error.textContent = 'Błąd połączenia z bazą danych.';
+      console.error('Błąd podczas sprawdzania unikalności username:', error.code, error.message);
+      error.textContent = 'Błąd połączenia z bazą danych. Spróbuj ponownie.';
       error.style.display = 'block';
       console.groupEnd();
       return;
@@ -142,8 +142,8 @@ function showUsernameModal(user) {
       await set(ref(db, 'usernames/' + user.uid), { username: username });
       console.log('Zapisano username w /usernames');
     } catch (error) {
-      console.error('Błąd podczas zapisywania username:', error);
-      error.textContent = 'Błąd zapisu do bazy danych.';
+      console.error('Błąd podczas zapisywania username:', error.code, error.message);
+      error.textContent = 'Błąd zapisu do bazy danych. Spróbuj ponownie.';
       error.style.display = 'block';
       console.groupEnd();
       return;
