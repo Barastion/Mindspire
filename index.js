@@ -41,7 +41,7 @@ async function signInWithGoogle() {
     const user = result.user;
     console.log('Zalogowano przez Google:', user);
 
-    // Sprawdź, czy użytkownik ma już wybrany username
+    // Sprawdź, czy użytkownik ma już wybrany customUsername
     const userRef = ref(db, 'users/' + user.uid);
     const userSnapshot = await get(userRef);
     if (!userSnapshot.exists() || !userSnapshot.val().customUsername) {
@@ -88,7 +88,8 @@ function showUsernameModal(user) {
     }
 
     // Sprawdź unikalność username
-    console.groupCollapsed("Sprawdzanie unikalności username");
+    console.groupCollapsed("Logowanie");
+    console.log('Sprawdzanie unikalności username:', username);
     const usernamesRef = ref(db, 'usernames');
     const queryRef = query(usernamesRef, orderByChild('username'), equalTo(username));
     const snapshot = await get(queryRef);
@@ -103,7 +104,8 @@ function showUsernameModal(user) {
     console.groupEnd();
 
     // Zapisz dane użytkownika
-    console.groupCollapsed("Zapis username");
+    console.groupCollapsed("Logowanie");
+    console.log('Zapis username dla użytkownika:', user.uid);
     const userRef = ref(db, 'users/' + user.uid);
     const userData = {
       customUsername: username,
@@ -119,7 +121,7 @@ function showUsernameModal(user) {
     console.groupEnd();
 
     modal.style.display = 'none';
-    alert('Username został zapisany!');
+    alert('Zalogowano pomyślnie! Username został zapisany.');
   };
 }
 
