@@ -11,7 +11,7 @@
     <!-- Preconnect dla przyspieszenia połączenia z Google -->
     <link rel="preconnect" href="https://accounts.google.com">
     <link rel="preconnect" href="https://www.gstatic.com">
-    <!-- Firebase CDN scripts - zaktualizowana wersja -->
+    <!-- Firebase CDN scripts -->
     <script type="module" src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js"></script>
     <script type="module" src="https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics.js"></script>
     <script type="module" src="https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js"></script>
@@ -49,6 +49,14 @@
         </footer>
     </div>
 
+    <!-- Modal do wyboru username -->
+    <div id="usernameModal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2D2D2D; padding: 20px; border-radius: 10px; z-index: 1002; color: #FFFFFF; border: 2px solid red;">
+        <h3>Wybierz swój username</h3>
+        <input type="text" id="usernameInput" placeholder="Wpisz username" style="width: 100%; padding: 10px; margin-bottom: 10px;">
+        <button id="submitUsernameButton">Zatwierdź</button>
+        <p id="usernameError" style="color: red; display: none;"></p>
+    </div>
+
     <script type="module" defer src="index.js"></script>
 
     <script>
@@ -64,19 +72,14 @@
             try {
                 let contentHtml;
                 if (section === 'strona-glowna') {
-                    // Dla strony głównej używamy domyślnej zawartości
                     contentHtml = defaultContent;
                 } else {
-                    // Ładujemy zawartość z odpowiedniego pliku HTML
                     const response = await fetch(`${section}.html`);
                     if (!response.ok) throw new Error('Nie udało się załadować sekcji');
                     contentHtml = await response.text();
                 }
-
-                // Wstawiamy nową zawartość do content-wrapper
                 contentWrapper.innerHTML = contentHtml;
 
-                // Usuwamy i dodajemy odpowiednie style CSS
                 const existingStyles = document.querySelector('link[data-section-style]');
                 if (existingStyles) existingStyles.remove();
 
@@ -88,7 +91,6 @@
                     document.head.appendChild(styleLink);
                 }
 
-                // Aktualizujemy klasę active
                 navItems.forEach(item => item.classList.remove('active'));
                 const activeItem = document.querySelector(`.nav-item[data-section="${section}"]`);
                 if (activeItem) activeItem.classList.add('active');
