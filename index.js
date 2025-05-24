@@ -67,62 +67,92 @@ function showUsernameModal(user) {
   const modal = document.getElementById('usernameModal');
   const input = document.getElementById('usernameInput');
   const error = document.getElementById('usernameError');
-  const submitButton = document.getElementById('submitUsernameButton');
+  const submitButton = document.querySelector('.submit-username-btn');
+
+  if (!modal || !input || !error || !submitButton) {
+    console.error('Nie znaleziono elementów modala:', { modal, input, error, submitButton });
+    alert('Błąd: Nie można wyświetlić modala wyboru username.');
+    return;
+  }
 
   modal.style.display = 'block';
   input.value = '';
   error.style.display = 'none';
 
-  submitButton.onclick = async () => {
+  // Usuń istniejące nasłuchiwacze, aby uniknąć duplikatów
+  const newSubmitButton = submitButton.cloneNode(true);
+  submitButton.parentNode.replaceChild(newSubmitButton, submitButton);
+
+  newSubmitButton.addEventListener('click', async () => {
+    console.groupCollapsed("Logowanie");
+    console.log('Kliknięto przycisk Zatwierdź');
     const username = input.value.trim();
+
     // Walidacja username
     if (username.length < 3) {
+      console.log('Błąd walidacji: Username za krótki');
       error.textContent = 'Username musi mieć co najmniej 3 znaki.';
       error.style.display = 'block';
+      console.groupEnd();
       return;
     }
     if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      console.log('Błąd walidacji: Niedozwolone znaki w username');
       error.textContent = 'Username może zawierać tylko litery, cyfry i podkreślniki.';
       error.style.display = 'block';
+      console.groupEnd();
       return;
     }
 
     // Sprawdź unikalność username
-    console.groupCollapsed("Logowanie");
-    console.log('Sprawdzanie unikalności username:', username);
-    const usernamesRef = ref(db, 'usernames');
-    const queryRef = query(usernamesRef, orderByChild('username'), equalTo(username));
-    const snapshot = await get(queryRef);
-    if (snapshot.exists()) {
-      console.log('Username już zajęty:', username);
-      console.groupEnd();
-      error.textContent = 'Ten username jest już zajęty.';
+    try {
+      console.log('Sprawdzanie unikalności username:', username);
+      const usernamesRef = ref(db, 'usernames');
+      const queryRef = query(usernamesRef, orderByChild('username'), equalTo(username));
+      const snapshot = await get(queryRef);
+      if (snapshot.exists()) {
+        console.log('Username już zajęty:', username);
+        error.textContent = 'Ten username jest już zajęty.';
+        error.style.display = 'block';
+        console.groupEnd();
+        return;
+      }
+      console.log('Username dostępny:', username);
+    } catch (error) {
+      console.error('Błąd podczas sprawdzania unikalności username:', error);
+      error.textContent = 'Błąd połączenia z bazą danych.';
       error.style.display = 'block';
+      console.groupEnd();
       return;
     }
-    console.log('Username dostępny:', username);
-    console.groupEnd();
 
     // Zapisz dane użytkownika
-    console.groupCollapsed("Logowanie");
-    console.log('Zapis username dla użytkownika:', user.uid);
-    const userRef = ref(db, 'users/' + user.uid);
-    const userData = {
-      customUsername: username,
-      email: user.email,
-      lastLogin: new Date().toISOString()
-    };
-    await set(userRef, userData);
-    console.log('Zapisano dane użytkownika:', userData);
+    try {
+      console.log('Zapis username dla użytkownika:', user.uid);
+      const userRef = ref(db, 'users/' + user.uid);
+      const userData = {
+        customUsername: username,
+        email: user.email,
+        lastLogin: new Date().toISOString()
+      };
+      await set(userRef, userData);
+      console.log('Zapisano dane użytkownika:', userData);
 
-    // Zapisz username w /usernames dla unikalności
-    await set(ref(db, 'usernames/' + user.uid), { username: username });
-    console.log('Zapisano username w /usernames');
+      // Zapisz username w /usernames dla unikalności
+      await set(ref(db, 'usernames/' + user.uid), { username: username });
+      console.log('Zapisano username w /usernames');
+    } catch (error) {
+      console.error('Błąd podczas zapisywania username:', error);
+      error.textContent = 'Błąd zapisu do bazy danych.';
+      error.style.display = 'block';
+      console.groupEnd();
+      return;
+    }
+
     console.groupEnd();
-
     modal.style.display = 'none';
     alert('Zalogowano pomyślnie! Username został zapisany.');
-  };
+  });
 }
 
 // Funkcja do wyświetlania panelu logowania
