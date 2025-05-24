@@ -1,7 +1,7 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import { getAnalytics } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-analytics.js';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { getDatabase, ref, set } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
+import { getAnalytics } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
+import { getDatabase, ref, set } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
 
 // Inicjalizacja Firebase z grupowaniem logów
 console.groupCollapsed("Inicjalizacja Firebase");
@@ -31,13 +31,20 @@ console.log('Database initialized:', db);
 console.groupEnd();
 console.log("Pomyślnie zalogowano do Firebase");
 
-// Funkcja do logowania przez Google z grupowaniem logów
+// Funkcja do logowania przez Google z grupowaniem logów i znacznikami czasu
 async function signInWithGoogle() {
+  const loadingElement = document.getElementById('loading');
+  loadingElement.style.display = 'block';
+
   console.groupCollapsed("Logowanie");
+  const startTime = new Date().toISOString();
+  console.log('Starting Google sign-in process at', startTime);
+
   try {
-    console.log('Starting Google sign-in process');
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
+    const popupResolvedTime = new Date().toISOString();
+    console.log('Popup resolved at', popupResolvedTime);
     const user = result.user;
     console.log('Zalogowano przez Google:', user);
 
@@ -50,13 +57,15 @@ async function signInWithGoogle() {
     console.log('Attempting to write user data to:', userRef.toString(), 'with data:', userData);
 
     await set(userRef, userData);
-    console.log('Dane użytkownika zapisano pomyślnie');
+    console.log('Dane użytkownika zapisano pomyślnie at', new Date().toISOString());
   } catch (error) {
     console.error('Błąd logowania:', error.code, error.message);
     console.groupEnd();
     console.log("Niepomyślnie zalogowano");
     alert('Błąd logowania: ' + error.message);
     return;
+  } finally {
+    loadingElement.style.display = 'none';
   }
   console.groupEnd();
   console.log("Pomyślnie zalogowano");
