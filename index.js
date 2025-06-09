@@ -240,16 +240,6 @@ function handleLogout() {
     });
 }
 
-// Obsługa stanu zalogowania z komunikatem wylogowania
-let wasLoggedIn = false;
-onAuthStateChanged(auth, (user) => {
-  if (!user && wasLoggedIn) {
-    alert('Wylogowano pomyślnie!');
-  }
-  wasLoggedIn = !!user;
-  updateLoginSection(user);
-});
-
 // Funkcje logowania odwiedzin
 
 let isLoggingVisit = false;
@@ -435,8 +425,120 @@ function getCachedData(cacheKey, cacheTimeKey, cacheDuration) {
     return null;
 }
 
+// Funkcja do ładowania i wyświetlania logów
+async function loadLogs() {
+    const logTableBody = document.getElementById('logTableBody');
+    if (!logTableBody) {
+        console.error('Nie znaleziono elementu logTableBody');
+        return;
+    }
+
+    try {
+        const logsRef = ref(db, 'logs');
+        const snapshot = await get(logsRef);
+        if (!snapshot.exists()) {
+            logTableBody.innerHTML = '<tr><td colspan="6">Brak logów do wyświetlenia.</td></tr>';
+            return;
+        }
+
+        const logs = [];
+        snapshot.forEach(child => {
+            const log = child.val();
+            logs.push(log);
+        });
+
+        // Sortuj logi malejąco po timestamp (najnowsze na górze)
+        logs.sort((a, b) => b.timestamp - a.timestamp);
+
+        // Wypełnij tabelę
+        logTableBody.innerHTML =       = '';
+        logs.forEach(log => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${log.date}</td>
+                <td>${log.day}</td>
+                <td>${log.time}</td>
+                <td>${log.ip}</td>
+                <td>${log.location.city}, ${log.location.country}</td>
+                <td>${log.device}</td>
+            `;
+            logTableBody.appendChild(row);
+        });
+    } catch (error) {
+        console.error('Błąd ładowania logów:', error);
+        logTableBody.innerHTML = '<tr><td colspan="6">Błąd ładowania logów.</td></tr>';
+    }
+}
+
+// Obsługa stanu zalogowania z komunikatem wylogowania
+let wasLoggedIn = false;
+onAuthStateChanged(auth, (user) => {
+  if (!user && wasLoggedIn) {
+    alert('Wylogowano pomyślnie!');
+  }
+  wasLoggedIn = !!user;
+  updateLoginSection(user);
+});
+
 // Inicjalizacja: ustawienie początkowego stanu i logowanie wizyty
 document.addEventListener('DOMContentLoaded', () => {
   updateLoginSection(auth.currentUser);
   logVisit();
 });
+
+// Pobieramy wszystkie zakładki i element content-wrapper
+const navItems = document.querySelectorAll('.nav-item');
+const contentWrapper = document.getElementById('content-wrapper');
+
+// Domyślna zawartość dla strony głównej
+const defaultContent = contentWrapper.innerHTML;
+
+// Funkcja do ładowania zawartości
+async function loadSection(section) {
+    try {
+        let contentHtml;
+        if (section === 'strona-glowna') {
+            contentHtml = defaultContent;
+        } else {
+            const response = await fetch(`${section}.html`);
+            if (!response.ok) throw new Error('Nie udało się załadować sekcji');
+            contentHtml = await response.text();
+        }
+        contentWrapper.innerHTML = contentHtml;
+
+        const existingStyles = document.querySelector('link[data-section-style]');
+        if (existingStyles) existingStyles.remove();
+
+        if (section !== 'strona-glowna') {
+            const styleLink = document.createElement('link');
+            styleLink.rel = 'stylesheet';
+            styleLink.href = `${section}.css`;
+            styleLink.setAttribute('data-section-style', section);
+            document.head.appendChild(styleLink);
+        }
+
+        navItems.forEach(item => item.classList.remove('active'));
+        const activeItem = document.querySelector(`.nav-item[data-section="${section}"]`);
+        if (activeItem) activeItem.classList.add('active');
+
+        // Ładuj logi dla sekcji Społeczność
+        if (section === 'spolecznosc') {
+            loadLogs();
+        }
+    } catch (error) {
+        console.error('Błąd podczas ładowania sekcji:', error);
+        contentWrapper.innerHTML = '<div class="content"><h2>Błąd</h2><p>Nie udało się załadować sekcji.</p></div>';
+    }
+}
+
+// Obsługa kliknięć w zakładki
+navItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const section = item.getAttribute('data-section');
+        loadSection(section);
+    });
+});
+
+// Załaduj domyślną sekcję przy starcie
+loadSection('strona-glowna');
