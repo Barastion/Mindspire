@@ -1,28 +1,15 @@
 .spolecznosc-content {
-  background-color: #2D2D2D;
-  padding: 20px;
-  font-size: 14px;
-  border-radius: 10px;
-  color: #FFFFFF;
+    background-color: #2D2D2D;
+    padding: 20px;
+    font-size: 14px;
+    border-radius: 10px;
 }
 
 .spolecznosc-content h2 {
-  font-size: 18px;
-  margin-bottom: 10px;
+    font-size: 18px;
+    margin-bottom: 10px;
 }
 
-#logTableContainer {
-  height: 300px;
-  overflow-y: scroll;
-}
-
-#logTable {
-  width: 100%;
-  table-layout: fixed;
-  text-align: center;
-}
-
-#logTable th, #logTable td {
-  padding: 8px;
-  word-wrap: break-word;
+.spolecznosc-content p {
+    line-height: 1.5;
 }
