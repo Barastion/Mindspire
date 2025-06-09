@@ -241,233 +241,255 @@ function handleLogout() {
 }
 
 // Funkcje logowania odwiedzin
-
 let isLoggingVisit = false;
 
 async function logVisit() {
-    if (isLoggingVisit) {
-        console.log('Logowanie w toku, pomijam.');
-        return;
+  if (isLoggingVisit) {
+    console.log('Logowanie w toku, pomijam.');
+    return;
+  }
+  if (sessionStorage.getItem('visitLogged')) {
+    console.log('Log już zapisany w tej sesji, pomijam.');
+    return;
+  }
+
+  isLoggingVisit = true;
+  console.log('Rozpoczynam zapis logu...');
+
+  try {
+    const now = new Date();
+    const date = now.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const day = capitalizeFirstLetter(now.toLocaleDateString('pl-PL', { weekday: 'long' }));
+    const time = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+    const ip = await getIp();
+    const location = await getLocation(ip);
+    const userAgent = navigator.userAgent;
+    const device = getDeviceType(userAgent);
+    const isp = location.isp || 'Nieznany dostawca';
+    const timestamp = now.getTime();
+
+    const isDuplicate = await checkDuplicateLog(ip, device, timestamp);
+    if (isDuplicate) {
+      console.log('Duplikat logu, pomijam zapis.');
+      return;
     }
-    if (sessionStorage.getItem('visitLogged')) {
-        console.log('Log już zapisany w tej sesji, pomijam.');
-        return;
-    }
 
-    isLoggingVisit = true;
-    console.log('Rozpoczynam zapis logu...');
+    const logEntry = { date, day, time, ip, location, device, isp, timestamp };
+    const logsRef = ref(db, 'logs');
+    const newLogRef = push(logsRef);
 
-    try {
-        const now = new Date();
-        const date = now.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        const day = capitalizeFirstLetter(now.toLocaleDateString('pl-PL', { weekday: 'long' }));
-        const time = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
-        const ip = await getIp();
-        const location = await getLocation(ip);
-        const userAgent = navigator.userAgent;
-        const device = getDeviceType(userAgent);
-        const isp = location.isp || 'Nieznany dostawca';
-        const timestamp = now.getTime();
+    await set(newLogRef, logEntry);
+    console.log('Log zapisany:', logEntry);
+    sessionStorage.setItem('visitLogged', 'true');
 
-        const isDuplicate = await checkDuplicateLog(ip, device, timestamp);
-        if (isDuplicate) {
-            console.log('Duplikat logu, pomijam zapis.');
-            return;
-        }
-
-        const logEntry = { date, day, time, ip, location, device, isp, timestamp };
-        const logsRef = ref(db, 'logs');
-        const newLogRef = push(logsRef);
-
-        await set(newLogRef, logEntry);
-        console.log('Log zapisany:', logEntry);
-        sessionStorage.setItem('visitLogged', 'true');
-
-        // Czyszczenie logów po zapisie
-        await cleanupLogs();
-    } catch (error) {
-        console.error('Błąd zapisu logu:', error);
-    } finally {
-        isLoggingVisit = false;
-    }
+    // Czyszczenie logów po zapisie
+    await cleanupLogs();
+  } catch (error) {
+    console.error('Błąd zapisu logu:', error);
+  } finally {
+    isLoggingVisit = false;
+  }
 }
 
 async function checkDuplicateLog(ip, device, timestamp) {
-    const logsRef = ref(db, 'logs');
-    return new Promise((resolve) => {
-        get(logsRef).then((snapshot) => {
-            const logsData = snapshot.val();
-            if (!logsData) {
-                resolve(false);
-                return;
-            }
-            const logs = Object.values(logsData);
-            const tenMinutesAgo = timestamp - (10 * 60 * 1000);
-            const isDuplicate = logs.some(log =>
-                log.ip === ip &&
-                log.device === device &&
-                log.timestamp > tenMinutesAgo
-            );
-            resolve(isDuplicate);
-        }).catch((error) => {
-            console.error('Błąd odczytu logów:', error);
-            resolve(false);
-        });
+  const logsRef = ref(db, 'logs');
+  return new Promise((resolve) => {
+    get(logsRef).then((snapshot) => {
+      const logsData = snapshot.val();
+      if (!logsData) {
+        console.log('Brak danych logów w checkDuplicateLog');
+        resolve(false);
+        return;
+      }
+      const logs = Object.values(logsData);
+      const tenMinutesAgo = timestamp - (10 * 60 * 1000);
+      const isDuplicate = logs.some(log =>
+        log.ip === ip &&
+        log.device === device &&
+        log.timestamp > tenMinutesAgo
+      );
+      console.log('Wynik sprawdzania duplikatów:', isDuplicate);
+      resolve(isDuplicate);
+    }).catch((error) => {
+      console.error('Błąd odczytu logów w checkDuplicateLog:', error);
+      resolve(false);
     });
+  });
 }
 
 async function cleanupLogs() {
-    const now = Date.now();
-    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
-    const logsRef = ref(db, 'logs');
-    const snapshot = await get(logsRef);
-    const logs = [];
-    const toRemove = [];
+  console.log('Rozpoczynam czyszczenie logów...');
+  const now = Date.now();
+  const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+  const logsRef = ref(db, 'logs');
+  const snapshot = await get(logsRef);
+  const logs = [];
+  const toRemove = [];
 
-    if (!snapshot.exists()) return;
+  if (!snapshot.exists()) {
+    console.log('Brak logów do czyszczenia');
+    return;
+  }
 
-    snapshot.forEach(child => {
-        const key = child.key;
-        const log = child.val();
-        if (log.timestamp < thirtyDaysAgo) {
-            toRemove.push(key);
-        } else {
-            logs.push({ key, timestamp: log.timestamp });
-        }
-    });
-
-    // Usuń logi starsze niż 30 dni
-    for (const key of toRemove) {
-        await remove(ref(db, `logs/${key}`));
+  snapshot.forEach(child => {
+    const key = child.key;
+    const log = child.val();
+    if (log.timestamp < thirtyDaysAgo) {
+      toRemove.push(key);
+    } else {
+      logs.push({ key, timestamp: log.timestamp });
     }
+  });
 
-    // Jeśli pozostało więcej niż 100 logów, usuń najstarsze
-    if (logs.length > 100) {
-        logs.sort((a, b) => a.timestamp - b.timestamp); // Sortuj rosnąco (najstarsze pierwsze)
-        const numToRemove = logs.length - 100;
-        for (let i = 0; i < numToRemove; i++) {
-            await remove(ref(db, `logs/${logs[i].key}`));
-        }
+  // Usuń logi starsze niż 30 dni
+  for (const key of toRemove) {
+    console.log('Usuwam log:', key);
+    await remove(ref(db, `logs/${key}`));
+  }
+
+  // Jeśli pozostało więcej niż 100 logów, usuń najstarsze
+  if (logs.length > 100) {
+    logs.sort((a, b) => a.timestamp - b.timestamp); // Sortuj rosnąco (najstarsze pierwsze)
+    const numToRemove = logs.length - 100;
+    for (let i = 0; i < numToRemove; i++) {
+      console.log('Usuwam nadmiarowy log:', logs[i].key);
+      await remove(ref(db, `logs/${logs[i].key}`));
     }
+  }
+  console.log('Czyszczenie logów zakończone');
 }
 
 async function getIp() {
-    const cacheKey = 'ip_data';
-    const cacheTimeKey = 'ip_time';
-    const cacheDuration = 15 * 60 * 1000; // 15 minut
-    const cachedData = getCachedData(cacheKey, cacheTimeKey, cacheDuration);
-    if (cachedData) return cachedData.ip;
+  const cacheKey = 'ip_data';
+  const cacheTimeKey = 'ip_time';
+  const cacheDuration = 15 * 60 * 1000; // 15 minut
+  const cachedData = getCachedData(cacheKey, cacheTimeKey, cacheDuration);
+  if (cachedData) {
+    console.log('Pobrano IP z cache:', cachedData.ip);
+    return cachedData.ip;
+  }
 
-    const data = await retryFetch('https://api.ipify.org?format=json');
-    setCachedData(cacheKey, cacheTimeKey, data);
-    return data.ip || 'Nieznany IP';
+  const data = await retryFetch('https://api.ipify.org?format=json');
+  console.log('Pobrano nowe IP:', data.ip);
+  setCachedData(cacheKey, cacheTimeKey, data);
+  return data.ip || 'Nieznany IP';
 }
 
 async function getLocation(ip) {
-    const cacheKey = `location_${ip}`;
-    const cacheTimeKey = `${cacheKey}_time`;
-    const cacheDuration = 24 * 60 * 60 * 1000; // 24 godziny
-    const cachedLocation = getCachedData(cacheKey, cacheTimeKey, cacheDuration);
-    if (cachedLocation) return cachedLocation;
+  const cacheKey = `location_${ip}`;
+  const cacheTimeKey = `${cacheKey}_time`;
+  const cacheDuration = 24 * 60 * 60 * 1000; // 24 godziny
+  const cachedLocation = getCachedData(cacheKey, cacheTimeKey, cacheDuration);
+  if (cachedLocation) {
+    console.log('Pobrano lokalizację z cache:', cachedLocation);
+    return cachedLocation;
+  }
 
-    const apiKey = 'ira_OaXnmZZCu9yfhUiomWbVy6blFQmAoI0BrILc';
-    const data = await retryFetch(`https://api.ipregistry.co/${ip}?key=${apiKey}`);
-    const location = {
-        city: data.location?.city || 'Nieznane miasto',
-        country: data.location?.country?.name || 'Nieznany kraj',
-        lat: data.location?.latitude || null,
-        lon: data.location?.longitude || null,
-        isp: data.connection?.organization || 'Nieznany dostawca'
-    };
-    setCachedData(cacheKey, cacheTimeKey, location);
-    return location;
+  const apiKey = 'ira_OaXnmZZCu9yfhUiomWbVy6blFQmAoI0BrILc';
+  const data = await retryFetch(`https://api.ipregistry.co/${ip}?key=${apiKey}`);
+  const location = {
+    city: data.location?.city || 'Nieznane miasto',
+    country: data.location?.country?.name || 'Nieznany kraj',
+    lat: data.location?.latitude || null,
+    lon: data.location?.longitude || null,
+    isp: data.connection?.organization || 'Nieznany dostawca'
+  };
+  console.log('Pobrano nową lokalizację:', location);
+  setCachedData(cacheKey, cacheTimeKey, location);
+  return location;
 }
 
 function getDeviceType(userAgent) {
-    if (userAgent.includes('Android')) return 'Android';
-    if (userAgent.includes('iPhone')) return 'iPhone';
-    if (userAgent.includes('iPad')) return 'Tablet';
-    if (userAgent.includes('Macintosh')) return 'Mac';
-    if (userAgent.includes('Windows') || userAgent.includes('Linux')) return 'PC';
-    return 'Inne';
+  if (userAgent.includes('Android')) return 'Android';
+  if (userAgent.includes('iPhone')) return 'iPhone';
+  if (userAgent.includes('iPad')) return 'Tablet';
+  if (userAgent.includes('Macintosh')) return 'Mac';
+  if (userAgent.includes('Windows') || userAgent.includes('Linux')) return 'PC';
+  return 'Inne';
 }
 
 function capitalizeFirstLetter(string) {
-    return string.charAt(0).toUpperCase() + string.slice(1);
+  return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
 async function retryFetch(url, options = {}, retries = 2, delay = 2000) {
-    for (let attempt = 1; attempt <= retries; attempt++) {
-        try {
-            const response = await fetch(url, options);
-            if (!response.ok) throw new Error(`Błąd HTTP: ${response.status}`);
-            return await response.json();
-        } catch (err) {
-            if (attempt === retries) throw err;
-            await new Promise(resolve => setTimeout(resolve, delay));
-        }
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok) throw new Error(`Błąd HTTP: ${response.status}`);
+      return await response.json();
+    } catch (err) {
+      if (attempt === retries) throw err;
+      console.log(`Próba ${attempt} nieudana, czekam ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
+  }
 }
 
 function setCachedData(cacheKey, cacheTimeKey, data) {
-    localStorage.setItem(cacheKey, JSON.stringify(data));
-    localStorage.setItem(cacheTimeKey, Date.now().toString());
+  localStorage.setItem(cacheKey, JSON.stringify(data));
+  localStorage.setItem(cacheTimeKey, Date.now().toString());
 }
 
 function getCachedData(cacheKey, cacheTimeKey, cacheDuration) {
-    const cachedData = localStorage.getItem(cacheKey);
-    const cachedTime = localStorage.getItem(cacheTimeKey);
-    const now = Date.now();
+  const cachedData = localStorage.getItem(cacheKey);
+  const cachedTime = localStorage.getItem(cacheTimeKey);
+  const now = Date.now();
 
-    if (cachedData && cachedTime && (now - parseInt(cachedTime) < cacheDuration)) {
-        return JSON.parse(cachedData);
-    }
-    return null;
+  if (cachedData && cachedTime && (now - parseInt(cachedTime) < cacheDuration)) {
+    return JSON.parse(cachedData);
+  }
+  return null;
 }
 
 // Funkcja do ładowania i wyświetlania logów
 async function loadLogs() {
-    const logTableBody = document.getElementById('logTableBody');
-    if (!logTableBody) {
-        console.error('Nie znaleziono elementu logTableBody');
-        return;
+  const logTableBody = document.getElementById('logTableBody');
+  if (!logTableBody) {
+    console.error('Nie znaleziono elementu logTableBody');
+    return;
+  }
+
+  try {
+    console.log('Pobieranie logów z Firebase...');
+    const logsRef = ref(db, 'logs');
+    const snapshot = await get(logsRef);
+    if (!snapshot.exists()) {
+      console.log('Brak danych w /logs');
+      logTableBody.innerHTML = '<tr><td colspan="6">Brak logów do wyświetlenia.</td></tr>';
+      return;
     }
 
-    try {
-        const logsRef = ref(db, 'logs');
-        const snapshot = await get(logsRef);
-        if (!snapshot.exists()) {
-            logTableBody.innerHTML = '<tr><td colspan="6">Brak logów do wyświetlenia.</td></tr>';
-            return;
-        }
+    const logs = [];
+    snapshot.forEach(child => {
+      const log = child.val();
+      console.log('Odczytano log:', log);
+      logs.push(log);
+    });
 
-        const logs = [];
-        snapshot.forEach(child => {
-            const log = child.val();
-            logs.push(log);
-        });
+    console.log('Liczba pobranych logów:', logs.length);
 
-        // Sortuj logi malejąco po timestamp (najnowsze na górze)
-        logs.sort((a, b) => b.timestamp - a.timestamp);
+    // Sortuj logi malejąco po timestamp (najnowsze na górze)
+    logs.sort((a, b) => b.timestamp - a.timestamp);
 
-        // Wypełnij tabelę
-        logTableBody.innerHTML =       = '';
-        logs.forEach(log => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${log.date}</td>
-                <td>${log.day}</td>
-                <td>${log.time}</td>
-                <td>${log.ip}</td>
-                <td>${log.location.city}, ${log.location.country}</td>
-                <td>${log.device}</td>
-            `;
-            logTableBody.appendChild(row);
-        });
-    } catch (error) {
-        console.error('Błąd ładowania logów:', error);
-        logTableBody.innerHTML = '<tr><td colspan="6">Błąd ładowania logów.</td></tr>';
-    }
+    // Wypełnij tabelę
+    logTableBody.innerHTML = '';
+    logs.forEach(log => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${log.date}</td>
+        <td>${log.day}</td>
+        <td>${log.time}</td>
+        <td>${log.ip}</td>
+        <td>${log.location.city}, ${log.location.country}</td>
+        <td>${log.device}</td>
+      `;
+      logTableBody.appendChild(row);
+    });
+  } catch (error) {
+    console.error('Błąd ładowania logów:', error);
+    logTableBody.innerHTML = '<tr><td colspan="6">Błąd ładowania logów.</td></tr>';
+  }
 }
 
 // Obsługa stanu zalogowania z komunikatem wylogowania
@@ -495,49 +517,49 @@ const defaultContent = contentWrapper.innerHTML;
 
 // Funkcja do ładowania zawartości
 async function loadSection(section) {
-    try {
-        let contentHtml;
-        if (section === 'strona-glowna') {
-            contentHtml = defaultContent;
-        } else {
-            const response = await fetch(`${section}.html`);
-            if (!response.ok) throw new Error('Nie udało się załadować sekcji');
-            contentHtml = await response.text();
-        }
-        contentWrapper.innerHTML = contentHtml;
-
-        const existingStyles = document.querySelector('link[data-section-style]');
-        if (existingStyles) existingStyles.remove();
-
-        if (section !== 'strona-glowna') {
-            const styleLink = document.createElement('link');
-            styleLink.rel = 'stylesheet';
-            styleLink.href = `${section}.css`;
-            styleLink.setAttribute('data-section-style', section);
-            document.head.appendChild(styleLink);
-        }
-
-        navItems.forEach(item => item.classList.remove('active'));
-        const activeItem = document.querySelector(`.nav-item[data-section="${section}"]`);
-        if (activeItem) activeItem.classList.add('active');
-
-        // Ładuj logi dla sekcji Społeczność
-        if (section === 'spolecznosc') {
-            loadLogs();
-        }
-    } catch (error) {
-        console.error('Błąd podczas ładowania sekcji:', error);
-        contentWrapper.innerHTML = '<div class="content"><h2>Błąd</h2><p>Nie udało się załadować sekcji.</p></div>';
+  try {
+    let contentHtml;
+    if (section === 'strona-glowna') {
+      contentHtml = defaultContent;
+    } else {
+      const response = await fetch(`${section}.html`);
+      if (!response.ok) throw new Error('Nie udało się załadować sekcji');
+      contentHtml = await response.text();
     }
+    contentWrapper.innerHTML = contentHtml;
+
+    const existingStyles = document.querySelector('link[data-section-style]');
+    if (existingStyles) existingStyles.remove();
+
+    if (section !== 'strona-glowna') {
+      const styleLink = document.createElement('link');
+      styleLink.rel = 'stylesheet';
+      styleLink.href = `${section}.css`;
+      styleLink.setAttribute('data-section-style', section);
+      document.head.appendChild(styleLink);
+    }
+
+    navItems.forEach(item => item.classList.remove('active'));
+    const activeItem = document.querySelector(`.nav-item[data-section="${section}"]`);
+    if (activeItem) activeItem.classList.add('active');
+
+    // Ładuj logi dla sekcji Społeczność z opóźnieniem
+    if (section === 'spolecznosc') {
+      setTimeout(loadLogs, 0);
+    }
+  } catch (error) {
+    console.error('Błąd podczas ładowania sekcji:', error);
+    contentWrapper.innerHTML = '<div class="content"><h2>Błąd</h2><p>Nie udało się załadować sekcji.</p></div>';
+  }
 }
 
 // Obsługa kliknięć w zakładki
 navItems.forEach(item => {
-    item.addEventListener('click', (e) => {
-        e.preventDefault();
-        const section = item.getAttribute('data-section');
-        loadSection(section);
-    });
+  item.addEventListener('click', (e) => {
+    e.preventDefault();
+    const section = item.getAttribute('data-section');
+    loadSection(section);
+  });
 });
 
 // Załaduj domyślną sekcję przy starcie
