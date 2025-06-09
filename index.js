@@ -1,7 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
 import { getAnalytics } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { getDatabase, ref, set, get, query, orderByChild, equalTo, onValue, remove } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
+import { getDatabase, ref, set, get, query, orderByChild, equalTo } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
 
 // Inicjalizacja Firebase z grupowaniem logów
 console.groupCollapsed("Inicjalizacja Firebase");
@@ -29,54 +29,32 @@ console.log('Firebase app initialized:', app);
 console.log('Auth initialized:', auth);
 console.log('Database initialized:', db);
 console.groupEnd();
-console.log("Pomyślnie zainicjalizowano Firebase");
+console.log("Pomyślnie zalogowano do Firebase");
 
-// Funkcja do pobierania IP użytkownika
-async function getUserIP() {
-  console.groupCollapsed("Pobieranie IP");
-  try {
-    const response = await fetch('https://api.ipify.org?format=json');
-    const data = await response.json();
-    console.log('Pobrano IP:', data.ip);
-    console.groupEnd();
-    return data.ip;
-  } catch (error) {
-    console.error('Błąd pobierania IP:', error.message);
-    console.groupEnd();
-    return 'Nieznane IP';
-  }
-}
-
-// Funkcja do logowania przez Google
+// Funkcja do logowania przez Google z grupowaniem logów
 async function signInWithGoogle() {
-  console.groupCollapsed("Logowanie przez Google");
+  console.groupCollapsed("Logowanie");
   try {
-    console.log('Rozpoczynanie procesu logowania przez Google');
+    console.log('Starting Google sign-in process');
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
     const user = result.user;
-    const userIP = await getUserIP();
-    console.log('Zalogowano przez Google:', user, 'IP:', userIP);
+    console.log('Zalogowano przez Google:', user);
 
-    // Sprawdź, czy użytkownik ma wybrany customUsername
+    // Sprawdź, czy użytkownik ma już wybrany customUsername
     const userRef = ref(db, 'users/' + user.uid);
     const userSnapshot = await get(userRef);
-    const userData = {
-      email: user.email,
-      lastLogin: new Date().toISOString(),
-      lastIp: userIP
-    };
     if (!userSnapshot.exists() || !userSnapshot.val().customUsername) {
       console.log('Użytkownik nie ma wybranego username, wyświetl modal');
-      showUsernameModal(user, userData);
+      showUsernameModal(user);
     } else {
-      console.log('Użytkownik ma już username, aktualizuj dane');
-      userData.customUsername = userSnapshot.val().customUsername;
-      await set(userRef, userData);
+      console.log('Użytkownik ma już username, aktualizuj lastLogin');
+      await set(ref(db, 'users/' + user.uid + '/lastLogin'), new Date().toISOString());
     }
   } catch (error) {
     console.error('Błąd logowania:', error.code, error.message);
     console.groupEnd();
+    console.log("Niepomyślnie zalogowano");
     alert('Błąd logowania: ' + error.message);
     return;
   }
@@ -85,7 +63,7 @@ async function signInWithGoogle() {
 }
 
 // Funkcja do wyświetlania modala wyboru username
-function showUsernameModal(user, userData) {
+function showUsernameModal(user) {
   const modal = document.getElementById('usernameModal');
   const input = document.getElementById('usernameInput');
   const error = document.getElementById('usernameError');
@@ -101,11 +79,13 @@ function showUsernameModal(user, userData) {
   input.value = '';
   error.style.display = 'none';
 
+  // Usuń istniejące nasłuchiwacze, aby uniknąć duplikatów
   const newSubmitButton = submitButton.cloneNode(true);
   submitButton.parentNode.replaceChild(newSubmitButton, submitButton);
 
   newSubmitButton.addEventListener('click', async () => {
-    console.groupCollapsed("Zapis username");
+    console.groupCollapsed("Logowanie");
+    console.log('Kliknięto przycisk Zatwierdź');
     const username = input.value.trim();
 
     // Walidacja username
@@ -139,8 +119,11 @@ function showUsernameModal(user, userData) {
       }
       console.log('Username dostępny:', username);
     } catch (error) {
-      console.error('Błąd sprawdzania unikalności username:', error.message);
+      console.error('Błąd podczas sprawdzania unikalności username:', error.message);
       error.textContent = 'Błąd połączenia z bazą danych. Spróbuj ponownie.';
+      if (error.message.includes('Index not defined')) {
+        error.textContent = 'Błąd konfiguracji bazy danych. Skontaktuj się z administratorem.';
+      }
       error.style.display = 'block';
       console.groupEnd();
       return;
@@ -149,13 +132,20 @@ function showUsernameModal(user, userData) {
     // Zapisz dane użytkownika
     try {
       console.log('Zapis username dla użytkownika:', user.uid);
-      userData.customUsername = username;
-      await set(ref(db, 'users/' + user.uid), userData);
+      const userRef = ref(db, 'users/' + user.uid);
+      const userData = {
+        customUsername: username,
+        email: user.email,
+        lastLogin: new Date().toISOString()
+      };
+      await set(userRef, userData);
       console.log('Zapisano dane użytkownika:', userData);
+
+      // Zapisz username w /usernames dla unikalności
       await set(ref(db, 'usernames/' + user.uid), { username: username });
       console.log('Zapisano username w /usernames');
     } catch (error) {
-      console.error('Błąd zapisywania username:', error.message);
+      console.error('Błąd podczas zapisywania username:', error.message);
       error.textContent = 'Błąd zapisu do bazy danych. Spróbuj ponownie.';
       error.style.display = 'block';
       console.groupEnd();
@@ -207,6 +197,7 @@ function updateLoginSection(user) {
   if (!loginDiv) return;
 
   if (user) {
+    // Pobierz customUsername z bazy danych
     const userRef = ref(db, 'users/' + user.uid);
     get(userRef).then((snapshot) => {
       if (snapshot.exists()) {
@@ -232,97 +223,24 @@ function updateLoginSection(user) {
   }
 }
 
-// Funkcja do wylogowania
+// Funkcja do wylogowania z grupowaniem logów
 function handleLogout() {
   console.groupCollapsed("Wylogowanie");
   signOut(auth)
     .then(() => {
-      console.log('Pomyślnie wylogowano');
+      console.log('signOut promise resolved');
       console.groupEnd();
+      console.log("Pomyślnie wylogowano");
     })
     .catch((error) => {
       console.error('Błąd wylogowania:', error.code, error.message);
       console.groupEnd();
+      console.log("Niepomyślnie wylogowano");
       alert('Błąd wylogowania: ' + error.message);
     });
 }
 
-// Funkcja do aktualizacji logów
-async function updateLogs() {
-  console.groupCollapsed("Aktualizacja logów");
-  const logsRef = ref(db, 'logs');
-  onValue(logsRef, async (snapshot) => {
-    const logsData = snapshot.val();
-    let logs = logsData ? Object.entries(logsData).map(([key, value]) => ({ key, ...value })) : [];
-    logs.sort((a, b) => b.timestamp - a.timestamp);
-
-    if (logs.length > 100) {
-      const logsToDelete = logs.slice(100);
-      logs = logs.slice(0, 100);
-      logsToDelete.forEach(log => remove(ref(db, `logs/${log.key}`)));
-      console.log('Usunięto starsze logi, pozostawiono 100 najnowszych');
-    }
-
-    // Pobierz dane użytkowników, aby sprawdzić lastIp
-    const usersRef = ref(db, 'users');
-    const usersSnapshot = await get(usersRef);
-    const usersData = usersSnapshot.val() || {};
-    const ipToUsername = {};
-    Object.entries(usersData).forEach(([uid, data]) => {
-      if (data.lastIp && data.customUsername) {
-        ipToUsername[data.lastIp] = data.customUsername;
-      }
-    });
-    console.log('Mapa IP do username:', ipToUsername);
-
-    displayLogs(logs, ipToUsername);
-    console.groupEnd();
-  });
-}
-
-// Funkcja do wyświetlania logów z przewijaniem
-function displayLogs(logs, ipToUsername) {
-  console.groupCollapsed("Wyświetlanie logów");
-  const logTableBody = document.getElementById('logTableBody');
-  if (!logTableBody) {
-    console.error('Nie znaleziono elementu logTableBody');
-    console.groupEnd();
-    return;
-  }
-
-  logTableBody.innerHTML = '';
-
-  if (logs.length === 0) {
-    logTableBody.innerHTML = '<tr><td colspan="6">Brak logów.</td></tr>';
-    console.log('Brak logów do wyświetlenia');
-    console.groupEnd();
-    return;
-  }
-
-  const visibleLogs = logs.slice(0, 10); // Pokazuj tylko 10 najnowszych logów
-  visibleLogs.forEach(log => {
-    const row = document.createElement('tr');
-    const ipDisplay = ipToUsername[log.ip] ? `${log.ip}<br>(${ipToUsername[log.ip]})` : log.ip;
-    row.innerHTML = `
-      <td>${log.date || 'Brak'}</td>
-      <td>${log.day || 'Brak'}</td>
-      <td>${log.time || 'Brak'}</td>
-      <td>${ipDisplay}</td>
-      <td>${log.location.city || 'Nieznane miasto'}<br>(${log.location.country || 'Nieznany kraj'})</td>
-      <td>${log.device || 'Brak'}<br>(${log.isp || 'Nieznany dostawca'})</td>
-    `;
-    logTableBody.appendChild(row);
-  });
-  console.log('Wyświetlono logi:', visibleLogs.length);
-  console.groupEnd();
-}
-
-// Inicjalizacja
-document.addEventListener('DOMContentLoaded', () => {
-  updateLoginSection(auth.currentUser);
-  updateLogs();
-});
-
+// Obsługa stanu zalogowania z komunikatem wylogowania
 let wasLoggedIn = false;
 onAuthStateChanged(auth, (user) => {
   if (!user && wasLoggedIn) {
@@ -330,4 +248,9 @@ onAuthStateChanged(auth, (user) => {
   }
   wasLoggedIn = !!user;
   updateLoginSection(user);
+});
+
+// Inicjalizacja: ustawienie początkowego stanu
+document.addEventListener('DOMContentLoaded', () => {
+  updateLoginSection(auth.currentUser);
 });
