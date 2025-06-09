@@ -79,7 +79,6 @@ function showUsernameModal(user) {
   input.value = '';
   error.style.display = 'none';
 
-  // Usuń istniejące nasłuchiwacze, aby uniknąć duplikatów
   const newSubmitButton = submitButton.cloneNode(true);
   submitButton.parentNode.replaceChild(newSubmitButton, submitButton);
 
@@ -88,7 +87,6 @@ function showUsernameModal(user) {
     console.log('Kliknięto przycisk Zatwierdź');
     const username = input.value.trim();
 
-    // Walidacja username
     if (username.length < 3) {
       console.log('Błąd walidacji: Username za krótki');
       error.textContent = 'Username musi mieć co najmniej 3 znaki.';
@@ -104,7 +102,6 @@ function showUsernameModal(user) {
       return;
     }
 
-    // Sprawdź unikalność username
     try {
       console.log('Sprawdzanie unikalności username:', username);
       const usernamesRef = ref(db, 'usernames');
@@ -129,7 +126,6 @@ function showUsernameModal(user) {
       return;
     }
 
-    // Zapisz dane użytkownika
     try {
       console.log('Zapis username dla użytkownika:', user.uid);
       const userRef = ref(db, 'users/' + user.uid);
@@ -141,7 +137,6 @@ function showUsernameModal(user) {
       await set(userRef, userData);
       console.log('Zapisano dane użytkownika:', userData);
 
-      // Zapisz username w /usernames dla unikalności
       await set(ref(db, 'usernames/' + user.uid), { username: username });
       console.log('Zapisano username w /usernames');
     } catch (error) {
@@ -197,7 +192,6 @@ function updateLoginSection(user) {
   if (!loginDiv) return;
 
   if (user) {
-    // Pobierz customUsername z bazy danych
     const userRef = ref(db, 'users/' + user.uid);
     get(userRef).then((snapshot) => {
       if (snapshot.exists()) {
@@ -282,7 +276,6 @@ async function logVisit() {
     console.log('Log zapisany:', logEntry);
     sessionStorage.setItem('visitLogged', 'true');
 
-    // Czyszczenie logów po zapisie
     await cleanupLogs();
   } catch (error) {
     console.error('Błąd zapisu logu:', error);
@@ -297,39 +290,33 @@ async function checkDuplicateLog(ip, device, timestamp) {
     get(logsRef).then((snapshot) => {
       const logsData = snapshot.val();
       if (!logsData) {
-        console.log('Brak danych logów w checkDuplicateLog');
         resolve(false);
         return;
       }
       const logs = Object.values(logsData);
-      const tenMinutesAgo = timestamp - (10 * 60 * 1000);
+      const tenMinutesAgo = timestamp - (10 * 60 * 1000); // 10 minut
       const isDuplicate = logs.some(log =>
         log.ip === ip &&
         log.device === device &&
         log.timestamp > tenMinutesAgo
       );
-      console.log('Wynik sprawdzania duplikatów:', isDuplicate);
       resolve(isDuplicate);
     }).catch((error) => {
-      console.error('Błąd odczytu logów w checkDuplicateLog:', error);
+      console.error('Błąd odczytu logów:', error);
       resolve(false);
     });
   });
 }
 
 async function cleanupLogs() {
-  console.log('Rozpoczynam czyszczenie logów...');
   const now = Date.now();
-  const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000); // 30 dni
   const logsRef = ref(db, 'logs');
   const snapshot = await get(logsRef);
   const logs = [];
   const toRemove = [];
 
-  if (!snapshot.exists()) {
-    console.log('Brak logów do czyszczenia');
-    return;
-  }
+  if (!snapshot.exists()) return;
 
   snapshot.forEach(child => {
     const key = child.key;
@@ -341,22 +328,17 @@ async function cleanupLogs() {
     }
   });
 
-  // Usuń logi starsze niż 30 dni
   for (const key of toRemove) {
-    console.log('Usuwam log:', key);
     await remove(ref(db, `logs/${key}`));
   }
 
-  // Jeśli pozostało więcej niż 100 logów, usuń najstarsze
   if (logs.length > 100) {
-    logs.sort((a, b) => a.timestamp - b.timestamp); // Sortuj rosnąco (najstarsze pierwsze)
+    logs.sort((a, b) => a.timestamp - b.timestamp); // Najstarsze pierwsze
     const numToRemove = logs.length - 100;
     for (let i = 0; i < numToRemove; i++) {
-      console.log('Usuwam nadmiarowy log:', logs[i].key);
       await remove(ref(db, `logs/${logs[i].key}`));
     }
   }
-  console.log('Czyszczenie logów zakończone');
 }
 
 async function getIp() {
@@ -364,13 +346,9 @@ async function getIp() {
   const cacheTimeKey = 'ip_time';
   const cacheDuration = 15 * 60 * 1000; // 15 minut
   const cachedData = getCachedData(cacheKey, cacheTimeKey, cacheDuration);
-  if (cachedData) {
-    console.log('Pobrano IP z cache:', cachedData.ip);
-    return cachedData.ip;
-  }
+  if (cachedData) return cachedData.ip;
 
   const data = await retryFetch('https://api.ipify.org?format=json');
-  console.log('Pobrano nowe IP:', data.ip);
   setCachedData(cacheKey, cacheTimeKey, data);
   return data.ip || 'Nieznany IP';
 }
@@ -380,21 +358,15 @@ async function getLocation(ip) {
   const cacheTimeKey = `${cacheKey}_time`;
   const cacheDuration = 24 * 60 * 60 * 1000; // 24 godziny
   const cachedLocation = getCachedData(cacheKey, cacheTimeKey, cacheDuration);
-  if (cachedLocation) {
-    console.log('Pobrano lokalizację z cache:', cachedLocation);
-    return cachedLocation;
-  }
+  if (cachedLocation) return cachedLocation;
 
   const apiKey = 'ira_OaXnmZZCu9yfhUiomWbVy6blFQmAoI0BrILc';
   const data = await retryFetch(`https://api.ipregistry.co/${ip}?key=${apiKey}`);
   const location = {
     city: data.location?.city || 'Nieznane miasto',
     country: data.location?.country?.name || 'Nieznany kraj',
-    lat: data.location?.latitude || null,
-    lon: data.location?.longitude || null,
     isp: data.connection?.organization || 'Nieznany dostawca'
   };
-  console.log('Pobrano nową lokalizację:', location);
   setCachedData(cacheKey, cacheTimeKey, location);
   return location;
 }
@@ -420,7 +392,6 @@ async function retryFetch(url, options = {}, retries = 2, delay = 2000) {
       return await response.json();
     } catch (err) {
       if (attempt === retries) throw err;
-      console.log(`Próba ${attempt} nieudana, czekam ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -442,7 +413,7 @@ function getCachedData(cacheKey, cacheTimeKey, cacheDuration) {
   return null;
 }
 
-// Funkcja do ładowania i wyświetlania logów
+// Funkcja do ładowania i wyświetlania logów w sekcji Społeczność
 async function loadLogs() {
   const logTableBody = document.getElementById('logTableBody');
   if (!logTableBody) {
@@ -451,11 +422,9 @@ async function loadLogs() {
   }
 
   try {
-    console.log('Pobieranie logów z Firebase...');
     const logsRef = ref(db, 'logs');
     const snapshot = await get(logsRef);
     if (!snapshot.exists()) {
-      console.log('Brak danych w /logs');
       logTableBody.innerHTML = '<tr><td colspan="6">Brak logów do wyświetlenia.</td></tr>';
       return;
     }
@@ -463,29 +432,30 @@ async function loadLogs() {
     const logs = [];
     snapshot.forEach(child => {
       const log = child.val();
-      console.log('Odczytano log:', log);
       logs.push(log);
     });
-
-    console.log('Liczba pobranych logów:', logs.length);
 
     // Sortuj logi malejąco po timestamp (najnowsze na górze)
     logs.sort((a, b) => b.timestamp - a.timestamp);
 
-    // Wypełnij tabelę
+    // Wypełnij tabelę wszystkimi logami (przewijanie obsłuży CSS)
     logTableBody.innerHTML = '';
     logs.forEach(log => {
       const row = document.createElement('tr');
       row.innerHTML = `
-        <td>${log.date}</td>
-        <td>${log.day}</td>
-        <td>${log.time}</td>
-        <td>${log.ip}</td>
-        <td>${log.location.city}, ${log.location.country}</td>
-        <td>${log.device}</td>
+        <td>${log.date || 'Brak'}</td>
+        <td>${log.day || 'Brak'}</td>
+        <td>${log.time || 'Brak'}</td>
+        <td>${log.ip || 'Brak'}</td>
+        <td>${log.location.city || 'Nieznane miasto'}, ${log.location.country || 'Nieznany kraj'}</td>
+        <td>${log.device || 'Brak'}</td>
       `;
       logTableBody.appendChild(row);
     });
+
+    // Ustaw przewijanie na górę tabeli po załadowaniu
+    const tableWrapper = document.querySelector('.table-wrapper');
+    if (tableWrapper) tableWrapper.scrollTop = 0;
   } catch (error) {
     console.error('Błąd ładowania logów:', error);
     logTableBody.innerHTML = '<tr><td colspan="6">Błąd ładowania logów.</td></tr>';
@@ -506,61 +476,62 @@ onAuthStateChanged(auth, (user) => {
 document.addEventListener('DOMContentLoaded', () => {
   updateLoginSection(auth.currentUser);
   logVisit();
-});
 
-// Pobieramy wszystkie zakładki i element content-wrapper
-const navItems = document.querySelectorAll('.nav-item');
-const contentWrapper = document.getElementById('content-wrapper');
+  // Pobieramy zakładki i element content-wrapper
+  const navItems = document.querySelectorAll('.nav-item');
+  const contentWrapper = document.getElementById('content-wrapper');
 
-// Domyślna zawartość dla strony głównej
-const defaultContent = contentWrapper.innerHTML;
+  // Domyślna zawartość dla strony głównej
+  const defaultContent = contentWrapper ? contentWrapper.innerHTML : '';
 
-// Funkcja do ładowania zawartości
-async function loadSection(section) {
-  try {
-    let contentHtml;
-    if (section === 'strona-glowna') {
-      contentHtml = defaultContent;
-    } else {
-      const response = await fetch(`${section}.html`);
-      if (!response.ok) throw new Error('Nie udało się załadować sekcji');
-      contentHtml = await response.text();
+  // Funkcja do ładowania zawartości sekcji
+  async function loadSection(section) {
+    if (!contentWrapper) return;
+    try {
+      let contentHtml;
+      if (section === 'strona-glowna') {
+        contentHtml = defaultContent;
+      } else {
+        const response = await fetch(`${section}.html`);
+        if (!response.ok) throw new Error('Nie udało się załadować sekcji');
+        contentHtml = await response.text();
+      }
+      contentWrapper.innerHTML = contentHtml;
+
+      const existingStyles = document.querySelector('link[data-section-style]');
+      if (existingStyles) existingStyles.remove();
+
+      if (section !== 'strona-glowna') {
+        const styleLink = document.createElement('link');
+        styleLink.rel = 'stylesheet';
+        styleLink.href = `${section}.css`;
+        styleLink.setAttribute('data-section-style', section);
+        document.head.appendChild(styleLink);
+      }
+
+      navItems.forEach(item => item.classList.remove('active'));
+      const activeItem = document.querySelector(`.nav-item[data-section="${section}"]`);
+      if (activeItem) activeItem.classList.add('active');
+
+      // Ładuj logi dla sekcji Społeczność
+      if (section === 'spolecznosc') {
+        await loadLogs();
+      }
+    } catch (error) {
+      console.error('Błąd podczas ładowania sekcji:', error);
+      contentWrapper.innerHTML = '<div class="content"><h2>Błąd</h2><p>Nie udało się załadować sekcji.</p></div>';
     }
-    contentWrapper.innerHTML = contentHtml;
-
-    const existingStyles = document.querySelector('link[data-section-style]');
-    if (existingStyles) existingStyles.remove();
-
-    if (section !== 'strona-glowna') {
-      const styleLink = document.createElement('link');
-      styleLink.rel = 'stylesheet';
-      styleLink.href = `${section}.css`;
-      styleLink.setAttribute('data-section-style', section);
-      document.head.appendChild(styleLink);
-    }
-
-    navItems.forEach(item => item.classList.remove('active'));
-    const activeItem = document.querySelector(`.nav-item[data-section="${section}"]`);
-    if (activeItem) activeItem.classList.add('active');
-
-    // Ładuj logi dla sekcji Społeczność z opóźnieniem
-    if (section === 'spolecznosc') {
-      setTimeout(loadLogs, 0);
-    }
-  } catch (error) {
-    console.error('Błąd podczas ładowania sekcji:', error);
-    contentWrapper.innerHTML = '<div class="content"><h2>Błąd</h2><p>Nie udało się załadować sekcji.</p></div>';
   }
-}
 
-// Obsługa kliknięć w zakładki
-navItems.forEach(item => {
-  item.addEventListener('click', (e) => {
-    e.preventDefault();
-    const section = item.getAttribute('data-section');
-    loadSection(section);
+  // Obsługa kliknięć w zakładki
+  navItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const section = item.getAttribute('data-section');
+      loadSection(section);
+    });
   });
-});
 
-// Załaduj domyślną sekcję przy starcie
-loadSection('strona-glowna');
+  // Załaduj domyślną sekcję przy starcie
+  loadSection('strona-glowna');
+});
