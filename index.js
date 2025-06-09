@@ -31,7 +31,7 @@ console.log('Database initialized:', db);
 console.groupEnd();
 console.log("Pomyślnie zalogowano do Firebase");
 
-// Funkcja do logowania przez Google z grupowaniem logów
+// Funkcja do logowania przez Google z zapisem lastIp
 async function signInWithGoogle() {
   console.groupCollapsed("Logowanie");
   try {
@@ -41,6 +41,9 @@ async function signInWithGoogle() {
     const user = result.user;
     console.log('Zalogowano przez Google:', user);
 
+    // Pobierz IP użytkownika
+    const ip = await getIp();
+
     // Sprawdź, czy użytkownik ma już wybrany customUsername
     const userRef = ref(db, 'users/' + user.uid);
     const userSnapshot = await get(userRef);
@@ -48,8 +51,9 @@ async function signInWithGoogle() {
       console.log('Użytkownik nie ma wybranego username, wyświetl modal');
       showUsernameModal(user);
     } else {
-      console.log('Użytkownik ma już username, aktualizuj lastLogin');
+      console.log('Użytkownik ma już username, aktualizuj lastLogin i lastIp');
       await set(ref(db, 'users/' + user.uid + '/lastLogin'), new Date().toISOString());
+      await set(ref(db, 'users/' + user.uid + '/lastIp'), ip);
     }
   } catch (error) {
     console.error('Błąd logowania:', error.code, error.message);
@@ -62,7 +66,7 @@ async function signInWithGoogle() {
   console.log("Pomyślnie zalogowano");
 }
 
-// Funkcja do wyświetlania modala wyboru username
+// Funkcja do wyświetlania modala wyboru username z zapisem lastIp
 function showUsernameModal(user) {
   const modal = document.getElementById('usernameModal');
   const input = document.getElementById('usernameInput');
@@ -132,7 +136,8 @@ function showUsernameModal(user) {
       const userData = {
         customUsername: username,
         email: user.email,
-        lastLogin: new Date().toISOString()
+        lastLogin: new Date().toISOString(),
+        lastIp: await getIp() // Zapis lastIp
       };
       await set(userRef, userData);
       console.log('Zapisano dane użytkownika:', userData);
@@ -422,15 +427,16 @@ async function loadLogs() {
   }
 
   try {
+    // Pobierz logi
     const logsRef = ref(db, 'logs');
-    const snapshot = await get(logsRef);
-    if (!snapshot.exists()) {
+    const logsSnapshot = await get(logsRef);
+    if (!logsSnapshot.exists()) {
       logTableBody.innerHTML = '<tr><td colspan="6">Brak logów do wyświetlenia.</td></tr>';
       return;
     }
 
     const logs = [];
-    snapshot.forEach(child => {
+    logsSnapshot.forEach(child => {
       const log = child.val();
       logs.push(log);
     });
@@ -438,17 +444,32 @@ async function loadLogs() {
     // Sortuj logi malejąco po timestamp (najnowsze na górze)
     logs.sort((a, b) => b.timestamp - a.timestamp);
 
-    // Wypełnij tabelę wszystkimi logami (przewijanie obsłuży CSS)
+    // Pobierz użytkowników i ich lastIp
+    const usersRef = ref(db, 'users');
+    const usersSnapshot = await get(usersRef);
+    const userIpMap = {};
+    if (usersSnapshot.exists()) {
+      usersSnapshot.forEach(userChild => {
+        const userData = userChild.val();
+        if (userData.lastIp && userData.customUsername) {
+          userIpMap[userData.lastIp] = userData.customUsername;
+        }
+      });
+    }
+
+    // Wypełnij tabelę
     logTableBody.innerHTML = '';
     logs.forEach(log => {
       const row = document.createElement('tr');
+      const ipDisplay = log.ip || 'Brak';
+      const userName = userIpMap[log.ip] ? `<br>(${userIpMap[log.ip]})` : '';
       row.innerHTML = `
         <td>${log.date || 'Brak'}</td>
         <td>${log.day || 'Brak'}</td>
         <td>${log.time || 'Brak'}</td>
-        <td>${log.ip || 'Brak'}</td>
-        <td>${log.location.city || 'Nieznane miasto'}, ${log.location.country || 'Nieznany kraj'}</td>
-        <td>${log.device || 'Brak'}</td>
+        <td>${ipDisplay}${userName}</td>
+        <td>${log.location.city || 'Nieznane miasto'}<br>${log.location.country || 'Nieznany kraj'}</td>
+        <td>${log.device || 'Brak'}<br>${log.isp || 'Nieznany dostawca'}</td>
       `;
       logTableBody.appendChild(row);
     });
