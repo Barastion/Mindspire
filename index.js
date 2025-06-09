@@ -307,7 +307,7 @@ async function checkDuplicateLog(ip, device, timestamp) {
       );
       resolve(isDuplicate);
     }).catch((error) => {
-      console.error('Błąd odczytu logów:', error);
+      console.error('Błąd odczytu logów w checkDuplicateLog:', error);
       resolve(false);
     });
   });
@@ -353,9 +353,14 @@ async function getIp() {
   const cachedData = getCachedData(cacheKey, cacheTimeKey, cacheDuration);
   if (cachedData) return cachedData.ip;
 
-  const data = await retryFetch('https://api.ipify.org?format=json');
-  setCachedData(cacheKey, cacheTimeKey, data);
-  return data.ip || 'Nieznany IP';
+  try {
+    const data = await retryFetch('https://api.ipify.org?format=json');
+    setCachedData(cacheKey, cacheTimeKey, data);
+    return data.ip || 'Nieznany IP';
+  } catch (error) {
+    console.error('Błąd pobierania IP:', error);
+    return 'Nieznany IP';
+  }
 }
 
 async function getLocation(ip) {
@@ -365,15 +370,20 @@ async function getLocation(ip) {
   const cachedLocation = getCachedData(cacheKey, cacheTimeKey, cacheDuration);
   if (cachedLocation) return cachedLocation;
 
-  const apiKey = 'ira_OaXnmZZCu9yfhUiomWbVy6blFQmAoI0BrILc';
-  const data = await retryFetch(`https://api.ipregistry.co/${ip}?key=${apiKey}`);
-  const location = {
-    city: data.location?.city || 'Nieznane miasto',
-    country: data.location?.country?.name || 'Nieznany kraj',
-    isp: data.connection?.organization || 'Nieznany dostawca'
-  };
-  setCachedData(cacheKey, cacheTimeKey, location);
-  return location;
+  try {
+    const apiKey = 'ira_OaXnmZZCu9yfhUiomWbVy6blFQmAoI0BrILc';
+    const data = await retryFetch(`https://api.ipregistry.co/${ip}?key=${apiKey}`);
+    const location = {
+      city: data.location?.city || 'Nieznane miasto',
+      country: data.location?.country?.name || 'Nieznany kraj',
+      isp: data.connection?.organization || 'Nieznany dostawca'
+    };
+    setCachedData(cacheKey, cacheTimeKey, location);
+    return location;
+  } catch (error) {
+    console.error('Błąd pobierania lokalizacji:', error);
+    return { city: 'Nieznane miasto', country: 'Nieznany kraj', isp: 'Nieznany dostawca' };
+  }
 }
 
 function getDeviceType(userAgent) {
@@ -427,10 +437,14 @@ async function loadLogs() {
   }
 
   try {
+    console.log('Próba odczytu logów z:', ref(db, 'logs').path.toString());
+    console.log('Aktualny użytkownik:', auth.currentUser);
+
     // Pobierz logi
     const logsRef = ref(db, 'logs');
     const logsSnapshot = await get(logsRef);
     if (!logsSnapshot.exists()) {
+      console.log('Brak danych w ścieżce /logs');
       logTableBody.innerHTML = '<tr><td colspan="6">Brak logów do wyświetlenia.</td></tr>';
       return;
     }
@@ -445,16 +459,22 @@ async function loadLogs() {
     logs.sort((a, b) => b.timestamp - a.timestamp);
 
     // Pobierz użytkowników i ich lastIp
+    console.log('Próba odczytu użytkowników z:', ref(db, 'users').path.toString());
     const usersRef = ref(db, 'users');
-    const usersSnapshot = await get(usersRef);
+    const usersSnapshot = await get(usersRef).catch(error => {
+      console.error('Błąd odczytu użytkowników:', error);
+      return null;
+    });
     const userIpMap = {};
-    if (usersSnapshot.exists()) {
+    if (usersSnapshot && usersSnapshot.exists()) {
       usersSnapshot.forEach(userChild => {
         const userData = userChild.val();
         if (userData.lastIp && userData.customUsername) {
           userIpMap[userData.lastIp] = userData.customUsername;
         }
       });
+    } else {
+      console.warn('Brak danych użytkowników lub brak uprawnień do /users');
     }
 
     // Wypełnij tabelę
@@ -480,9 +500,9 @@ async function loadLogs() {
   } catch (error) {
     console.error('Błąd ładowania logów:', error);
     if (error.message.includes('Permission denied')) {
-      logTableBody.innerHTML = '<tr><td colspan="6">Brak uprawnień do wyświetlenia logów. Skontaktuj się z administratorem.</td></tr>';
+      logTableBody.innerHTML = '<tr><td colspan="6">Brak uprawnień do wyświetlenia logów. Upewnij się, że reguły Firebase zezwalają na odczyt ścieżki /logs.</td></tr>';
     } else {
-      logTableBody.innerHTML = '<tr><td colspan="6">Błąd ładowania logów. Spróbuj ponownie później.</td></tr>';
+      logTableBody.innerHTML = '<tr><td colspan="6">Błąd ładowania logów: ${error.message}. Spróbuj ponownie później.</td></tr>';
     }
   }
 }
