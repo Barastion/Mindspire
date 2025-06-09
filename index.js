@@ -1,7 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
 import { getAnalytics } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { getDatabase, ref, set, get, query, orderByChild, equalTo, remove } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
+import { getDatabase, ref, set, get, query, orderByChild, equalTo, remove, onValue, push } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
 
 // Inicjalizacja Firebase z grupowaniem logów
 console.groupCollapsed("Inicjalizacja Firebase");
@@ -43,6 +43,29 @@ async function getUserIp() {
   }
 }
 
+// Nowa funkcja do zapisu logów
+async function saveLog() {
+  const ip = await getUserIp();
+  if (!ip) return;
+
+  const now = new Date();
+  const logData = {
+    date: now.toLocaleDateString('pl-PL'),
+    day: now.toLocaleDateString('pl-PL', { weekday: 'long' }),
+    time: now.toLocaleTimeString('pl-PL'),
+    ip: ip,
+    location: { city: 'Nieznane', country: 'Nieznany' }, // Możesz dodać geolokalizację
+    device: navigator.userAgent,
+    isp: 'Nieznany',
+    timestamp: now.getTime()
+  };
+
+  const logsRef = ref(db, 'logs');
+  const newLogRef = push(logsRef); // Unikalny klucz dla każdego logu
+  await set(newLogRef, logData);
+  console.log('Zapisano log:', logData);
+}
+
 // Funkcja do logowania przez Google
 async function signInWithGoogle() {
   console.groupCollapsed("Logowanie");
@@ -53,11 +76,9 @@ async function signInWithGoogle() {
     const user = result.user;
     console.log('Zalogowano przez Google:', user);
 
-    // Pobierz IP użytkownika
     const ip = await getUserIp();
     console.log('IP użytkownika:', ip);
 
-    // Sprawdź, czy użytkownik ma już customUsername
     const userRef = ref(db, 'users/' + user.uid);
     const userSnapshot = await get(userRef);
     if (!userSnapshot.exists() || !userSnapshot.val().customUsername) {
@@ -272,41 +293,43 @@ onAuthStateChanged(auth, (user) => {
   updateLoginSection(user);
 });
 
-// Funkcja aktualizacji logów
-async function updateLogs() {
+// Funkcja aktualizacji logów (zmieniona na onValue)
+function updateLogs() {
   console.groupCollapsed("Aktualizacja logów");
-  try {
-    const ipToUserRef = ref(db, 'ipToUser');
-    const ipToUserSnapshot = await get(ipToUserRef);
-    const ipToUserMap = ipToUserSnapshot.val() || {};
+  const ipToUserRef = ref(db, 'ipToUser');
+  const logsRef = ref(db, 'logs');
+
+  onValue(ipToUserRef, (ipSnapshot) => {
+    const ipToUserMap = ipSnapshot.val() || {};
     console.log('Pobrano ipToUser:', ipToUserMap);
 
-    const logsRef = ref(db, 'logs');
-    const logsSnapshot = await get(logsRef);
-    const logsData = logsSnapshot.val();
-    let logs = logsData ? Object.entries(logsData).map(([key, value]) => ({ key, ...value })) : [];
-    logs.sort((a, b) => b.timestamp - a.timestamp);
-    console.log('Pobrano logi:', logs);
+    onValue(logsRef, (logsSnapshot) => {
+      const logsData = logsSnapshot.val();
+      let logs = logsData ? Object.entries(logsData).map(([key, value]) => ({ key, ...value })) : [];
+      logs.sort((a, b) => b.timestamp - a.timestamp);
+      console.log('Pobrano logi:', logs);
 
-    if (logs.length > 100) {
-      const logsToDelete = logs.slice(100);
-      logs = logs.slice(0, 100);
-      logsToDelete.forEach(log => remove(ref(db, `logs/${log.key}`)));
-      console.log('Usunięto stare logi:', logsToDelete);
-    }
+      if (logs.length > 100) {
+        const logsToDelete = logs.slice(100);
+        logs = logs.slice(0, 100);
+        logsToDelete.forEach(log => remove(ref(db, `logs/${log.key}`)));
+        console.log('Usunięto stare logi:', logsToDelete);
+      }
 
-    const logsWithUsername = logs.map(log => {
-      const ipKey = log.ip.replace(/\./g, '_');
-      const username = ipToUserMap[ipKey];
-      return username ? { ...log, username } : log;
+      const logsWithUsername = logs.map(log => {
+        const ipKey = log.ip.replace(/\./g, '_');
+        const username = ipToUserMap[ipKey];
+        return username ? { ...log, username } : log;
+      });
+
+      displayLogs(logsWithUsername);
+    }, (error) => {
+      console.error('Błąd pobierania logów:', error);
     });
-
-    displayLogs(logsWithUsername);
-    console.groupEnd();
-  } catch (error) {
-    console.error('Błąd pobierania logów:', error);
-    console.groupEnd();
-  }
+  }, (error) => {
+    console.error('Błąd pobierania ipToUser:', error);
+  });
+  console.groupEnd();
 }
 
 // Funkcja wyświetlania logów
@@ -334,4 +357,5 @@ function displayLogs(logs) {
 document.addEventListener('DOMContentLoaded', () => {
   updateLoginSection(auth.currentUser);
   updateLogs();
+  saveLog(); // Zapis logu przy wejściu na stronę
 });
