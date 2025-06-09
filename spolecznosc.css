@@ -1,4 +1,40 @@
-<div class="spolecznosc-content content">
-    <h2>Witaj w sekcji Społeczność</h2>
-    <p>Tutaj znajdziesz informacje o naszej społeczności.</p>
-</div>
+.spolecznosc-content {
+    background-color: #2D2D2D;
+    padding: 20px;
+    font-size: 14px;
+    border-radius: 10px;
+    color: #FFFFFF;
+}
+
+.spolecznosc-content h2 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.log-table-container {
+    max-height: 300px; /* Wysokość przewijania - dostosuj jeśli potrzeba */
+    overflow-y: auto;
+    margin-top: 10px;
+}
+
+#logTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#logTable th, #logTable td {
+    padding: 8px;
+    text-align: center; /* Wyśrodkowanie treści w poziomie */
+    border-bottom: 1px solid #444;
+}
+
+#logTable th {
+    background-color: #3D3D3D;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+#logTable td {
+    background-color: #2D2D2D;
+}
