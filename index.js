@@ -479,7 +479,11 @@ async function loadLogs() {
     if (tableWrapper) tableWrapper.scrollTop = 0;
   } catch (error) {
     console.error('Błąd ładowania logów:', error);
-    logTableBody.innerHTML = '<tr><td colspan="6">Błąd ładowania logów.</td></tr>';
+    if (error.message.includes('Permission denied')) {
+      logTableBody.innerHTML = '<tr><td colspan="6">Brak uprawnień do wyświetlenia logów. Skontaktuj się z administratorem.</td></tr>';
+    } else {
+      logTableBody.innerHTML = '<tr><td colspan="6">Błąd ładowania logów. Spróbuj ponownie później.</td></tr>';
+    }
   }
 }
 
