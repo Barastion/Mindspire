@@ -1,32 +1,29 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spolecznosc</title>
-    <link rel="stylesheet" href="spolecznosc.css">
+  <meta charset="UTF-8">
+  <title>Społeczność</title>
+  <link rel="stylesheet" href="spolecznosc.css">
 </head>
 <body>
-    <div class="spolecznosc-content">
-        <h2>Logi aktywności</h2>
-        <div class="log-table-container">
-            <table id="logTable">
-                <thead>
-                    <tr>
-                        <th>Data</th>
-                        <th>Dzień</th>
-                        <th>Godzina</th>
-                        <th>IP</th>
-                        <th>Lokalizacja</th>
-                        <th>Urządzenie</th>
-                    </tr>
-                </thead>
-                <tbody id="logTableBody">
-                    <!-- Logi będą wstawiane dynamicznie przez JavaScript -->
-                </tbody>
-            </table>
-        </div>
+  <div class="spolecznosc-content">
+    <h2>Logi</h2>
+    <div id="logTableContainer">
+      <table id="logTable">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Dzień</th>
+            <th>Godzina</th>
+            <th>IP</th>
+            <th>Lokalizacja</th>
+            <th>Urządzenie</th>
+          </tr>
+        </thead>
+        <tbody id="logTableBody"></tbody>
+      </table>
     </div>
-    <script type="module" src="index.js"></script>
+  </div>
+  <script src="index.js"></script>
 </body>
 </html>
