@@ -6,68 +6,39 @@
     color: #FFFFFF;
 }
 
-.spolecznosc-content h2 {
+.spolecznosc-content h2, .spolecznosc-content h3 {
     font-size: 18px;
-    margin-bottom: 15px;
-    color: #FFD700;
-    text-align: center;
+    margin-bottom: 10px;
 }
 
-.logs-container {
-    max-height: 400px;
+.spolecznosc-content p {
+    line-height: 1.5;
+}
+
+.log-table-container {
+    max-height: 300px;
     overflow-y: auto;
-    border: 1px solid #444;
-    border-radius: 5px;
-    background-color: #1a1a1a;
-    margin-bottom: 15px;
-}
-
-.logs-table {
-    width: 100%;
-    border-collapse: collapse;
-    text-align: center;
-}
-
-.logs-table th {
-    background-color: #333;
-    padding: 12px 8px;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    color: #FFA500;
-    border-bottom: 2px solid #444;
-}
-
-.logs-table td {
-    padding: 10px 8px;
-    border-bottom: 1px solid #444;
-    vertical-align: middle;
-}
-
-.logs-table tr:nth-child(even) {
-    background-color: #252525;
-}
-
-.logs-table tr:hover {
-    background-color: #333;
-}
-
-.username-tag {
-    color: #4CAF50;
-    font-size: 0.9em;
-    font-style: italic;
-}
-
-.logs-info {
-    text-align: center;
-    font-size: 0.9em;
-    color: #AAA;
     margin-top: 10px;
 }
 
-.loading {
+#logTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#logTable th, #logTable td {
+    padding: 8px;
     text-align: center;
-    color: #888;
-    font-style: italic;
-    padding: 20px;
+    border-bottom: 1px solid #444;
+}
+
+#logTable th {
+    background-color: #3D3D3D;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+#logTable td {
+    background-color: #2D2D2D;
 }
