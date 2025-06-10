@@ -1,4 +1,28 @@
-<div class="spolecznosc-content content">
-    <h2>Witaj w sekcji Społeczność</h2>
-    <p>Tutaj znajdziesz informacje o naszej społeczności.</p>
+<div class="spolecznosc-content">
+    <h2>Ostatnia aktywność w społeczności</h2>
+    
+    <div class="logs-container">
+        <table class="logs-table">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Dzień</th>
+                    <th>Godzina</th>
+                    <th>IP</th>
+                    <th>Lokalizacja</th>
+                    <th>Urządzenie</th>
+                </tr>
+            </thead>
+            <tbody id="logsTableBody">
+                <!-- Logi będą wstawiane dynamicznie -->
+                <tr>
+                    <td colspan="6" class="loading">Ładowanie danych...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="logs-info">
+        <p>Wyświetlono 10 z 100 ostatnich logów. Przewiń, aby zobaczyć więcej.</p>
+    </div>
 </div>
