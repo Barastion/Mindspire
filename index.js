@@ -29,32 +29,51 @@ console.log('Firebase app initialized:', app);
 console.log('Auth initialized:', auth);
 console.log('Database initialized:', db);
 console.groupEnd();
-console.log("Pomyślnie zalogowano do Firebase");
+console.log("Pomyślnie zainicjalizowano Firebase");
 
-// Funkcja do logowania przez Google z grupowaniem logów
+// Funkcja do pobierania adresu IP użytkownika
+async function getUserIp() {
+  try {
+    const response = await fetch('https://api.ipify.org?format=json');
+    const data = await response.json();
+    return data.ip;
+  } catch (error) {
+    console.error('Błąd pobierania IP:', error);
+    return 'unknown';
+  }
+}
+
+// Funkcja do logowania przez Google
 async function signInWithGoogle() {
   console.groupCollapsed("Logowanie");
   try {
-    console.log('Starting Google sign-in process');
+    console.log('Rozpoczęto proces logowania przez Google');
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
     const user = result.user;
     console.log('Zalogowano przez Google:', user);
+
+    // Pobierz adres IP
+    const ip = await getUserIp();
+    console.log('Pobrano adres IP:', ip);
 
     // Sprawdź, czy użytkownik ma już wybrany customUsername
     const userRef = ref(db, 'users/' + user.uid);
     const userSnapshot = await get(userRef);
     if (!userSnapshot.exists() || !userSnapshot.val().customUsername) {
       console.log('Użytkownik nie ma wybranego username, wyświetl modal');
-      showUsernameModal(user);
+      showUsernameModal(user, ip);
     } else {
-      console.log('Użytkownik ma już username, aktualizuj lastLogin');
-      await set(ref(db, 'users/' + user.uid + '/lastLogin'), new Date().toISOString());
+      console.log('Użytkownik ma już username, aktualizuj lastLogin i lastIp');
+      await set(ref(db, 'users/' + user.uid), {
+        ...userSnapshot.val(),
+        lastLogin: new Date().toISOString(),
+        lastIp: ip
+      });
     }
   } catch (error) {
     console.error('Błąd logowania:', error.code, error.message);
     console.groupEnd();
-    console.log("Niepomyślnie zalogowano");
     alert('Błąd logowania: ' + error.message);
     return;
   }
@@ -63,7 +82,7 @@ async function signInWithGoogle() {
 }
 
 // Funkcja do wyświetlania modala wyboru username
-function showUsernameModal(user) {
+function showUsernameModal(user, ip) {
   const modal = document.getElementById('usernameModal');
   const input = document.getElementById('usernameInput');
   const error = document.getElementById('usernameError');
@@ -79,16 +98,14 @@ function showUsernameModal(user) {
   input.value = '';
   error.style.display = 'none';
 
-  // Usuń istniejące nasłuchiwacze, aby uniknąć duplikatów
   const newSubmitButton = submitButton.cloneNode(true);
   submitButton.parentNode.replaceChild(newSubmitButton, submitButton);
 
   newSubmitButton.addEventListener('click', async () => {
-    console.groupCollapsed("Logowanie");
+    console.groupCollapsed("Wybór username");
     console.log('Kliknięto przycisk Zatwierdź');
     const username = input.value.trim();
 
-    // Walidacja username
     if (username.length < 3) {
       console.log('Błąd walidacji: Username za krótki');
       error.textContent = 'Username musi mieć co najmniej 3 znaki.';
@@ -104,7 +121,6 @@ function showUsernameModal(user) {
       return;
     }
 
-    // Sprawdź unikalność username
     try {
       console.log('Sprawdzanie unikalności username:', username);
       const usernamesRef = ref(db, 'usernames');
@@ -119,33 +135,26 @@ function showUsernameModal(user) {
       }
       console.log('Username dostępny:', username);
     } catch (error) {
-      console.error('Błąd podczas sprawdzania unikalności username:', error.message);
+      console.error('Błąd sprawdzania unikalności username:', error.message);
       error.textContent = 'Błąd połączenia z bazą danych. Spróbuj ponownie.';
-      if (error.message.includes('Index not defined')) {
-        error.textContent = 'Błąd konfiguracji bazy danych. Skontaktuj się z administratorem.';
-      }
       error.style.display = 'block';
       console.groupEnd();
       return;
     }
 
-    // Zapisz dane użytkownika
     try {
       console.log('Zapis username dla użytkownika:', user.uid);
-      const userRef = ref(db, 'users/' + user.uid);
       const userData = {
         customUsername: username,
         email: user.email,
-        lastLogin: new Date().toISOString()
+        lastLogin: new Date().toISOString(),
+        lastIp: ip
       };
-      await set(userRef, userData);
-      console.log('Zapisano dane użytkownika:', userData);
-
-      // Zapisz username w /usernames dla unikalności
+      await set(ref(db, 'users/' + user.uid), userData);
       await set(ref(db, 'usernames/' + user.uid), { username: username });
-      console.log('Zapisano username w /usernames');
+      console.log('Zapisano dane użytkownika:', userData);
     } catch (error) {
-      console.error('Błąd podczas zapisywania username:', error.message);
+      console.error('Błąd zapisu username:', error.message);
       error.textContent = 'Błąd zapisu do bazy danych. Spróbuj ponownie.';
       error.style.display = 'block';
       console.groupEnd();
@@ -164,16 +173,11 @@ function showLoginPanel() {
 
   const loginPanel = document.createElement('div');
   loginPanel.id = 'loginPanel';
-  loginPanel.style.position = 'fixed';
-  loginPanel.style.top = '50%';
-  loginPanel.style.left = '50%';
-  loginPanel.style.transform = 'translate(-50%, -50%)';
-  loginPanel.style.backgroundColor = '#2D2D2D';
-  loginPanel.style.padding = '20px';
-  loginPanel.style.borderRadius = '10px';
-  loginPanel.style.zIndex = '1001';
-  loginPanel.style.color = '#FFFFFF';
-  loginPanel.style.border = '2px solid red';
+  loginPanel.style.cssText = `
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background-color: #2D2D2D; padding: 20px; border-radius: 10px; z-index: 1001;
+    color: #FFFFFF; border: 2px solid red;
+  `;
   loginPanel.innerHTML = `
     <h3>Logowanie</h3>
     <button id="googleSignInButton">Zaloguj przez Google</button>
@@ -197,20 +201,14 @@ function updateLoginSection(user) {
   if (!loginDiv) return;
 
   if (user) {
-    // Pobierz customUsername z bazy danych
     const userRef = ref(db, 'users/' + user.uid);
     get(userRef).then((snapshot) => {
-      if (snapshot.exists()) {
-        const userData = snapshot.val();
-        const displayName = userData.customUsername || 'Użytkownik';
-        loginDiv.innerHTML = `Witaj, ${displayName} | <span id="authLink" style="cursor: pointer;">Wyloguj</span>`;
-      } else {
-        loginDiv.innerHTML = `Witaj, Użytkownik | <span id="authLink" style="cursor: pointer;">Wyloguj</span>`;
-      }
+      const userData = snapshot.exists() ? snapshot.val() : {};
+      const displayName = userData.customUsername || 'Użytkownik';
+      loginDiv.innerHTML = `Witaj, ${displayName} | <span id="authLink" style="cursor: pointer;">Wyloguj</span>`;
       const authLink = document.getElementById('authLink');
       authLink.replaceWith(authLink.cloneNode(true));
-      const newAuthLink = document.getElementById('authLink');
-      newAuthLink.addEventListener('click', handleLogout);
+      document.getElementById('authLink').addEventListener('click', handleLogout);
     }).catch((error) => {
       console.error('Błąd pobierania danych użytkownika:', error);
     });
@@ -218,29 +216,26 @@ function updateLoginSection(user) {
     loginDiv.innerHTML = 'Nie jesteś zalogowany | <span id="authLink" style="cursor: pointer;">Zaloguj / Zarejestruj</span>';
     const authLink = document.getElementById('authLink');
     authLink.replaceWith(authLink.cloneNode(true));
-    const newAuthLink = document.getElementById('authLink');
-    newAuthLink.addEventListener('click', showLoginPanel);
+    document.getElementById('authLink').addEventListener('click', showLoginPanel);
   }
 }
 
-// Funkcja do wylogowania z grupowaniem logów
+// Funkcja do wylogowania
 function handleLogout() {
   console.groupCollapsed("Wylogowanie");
   signOut(auth)
     .then(() => {
-      console.log('signOut promise resolved');
+      console.log('Wylogowanie zakończone');
       console.groupEnd();
-      console.log("Pomyślnie wylogowano");
     })
     .catch((error) => {
       console.error('Błąd wylogowania:', error.code, error.message);
       console.groupEnd();
-      console.log("Niepomyślnie wylogowano");
       alert('Błąd wylogowania: ' + error.message);
     });
 }
 
-// Obsługa stanu zalogowania z komunikatem wylogowania
+// Obsługa stanu zalogowania
 let wasLoggedIn = false;
 onAuthStateChanged(auth, (user) => {
   if (!user && wasLoggedIn) {
@@ -250,7 +245,7 @@ onAuthStateChanged(auth, (user) => {
   updateLoginSection(user);
 });
 
-// Inicjalizacja: ustawienie początkowego stanu
+// Inicjalizacja
 document.addEventListener('DOMContentLoaded', () => {
   updateLoginSection(auth.currentUser);
 });
