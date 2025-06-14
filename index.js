@@ -1,7 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
 import { getAnalytics } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { getDatabase, ref, set, get, query, orderByChild, equalTo, push, limitToLast } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
+import { getDatabase, ref, set, get, query, orderByChild, equalTo } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
 
 // Inicjalizacja Firebase z grupowaniem logów
 console.groupCollapsed("Inicjalizacja Firebase");
@@ -14,7 +14,7 @@ const firebaseConfig = {
   authDomain: "mindspire-2b5b4.firebaseapp.com",
   databaseURL: "https://mindspire-2b5b4-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "mindspire-2b5b4",
-  storageBucket: "mindspire-2b5b4.appspot.com",
+  storageBucket: "mindspire-2b5b4.firebasestorage.app",
   messagingSenderId: "796533772592",
   appId: "1:796533772592:web:44e3e6a34b84c7f663b8f5",
   measurementId: "G-HFZ8T97V5Y"
@@ -31,92 +31,7 @@ console.log('Database initialized:', db);
 console.groupEnd();
 console.log("Pomyślnie zalogowano do Firebase");
 
-// Funkcja do pobierania IP
-async function getIp() {
-  try {
-    const res = await fetch('https://api.ipify.org?format=json');
-    const data = await res.json();
-    return data.ip;
-  } catch {
-    return 'Nieznane IP';
-  }
-}
-
-// Funkcja do pobierania lokalizacji
-async function getLocation(ip) {
-  try {
-    const res = await fetch(`https://ipapi.co/${ip}/json/`);
-    const data = await res.json();
-    return {
-      city: data.city || 'Nieznane miasto',
-      country: data.country_name || 'Nieznany kraj',
-      isp: data.org || 'Nieznany dostawca'
-    };
-  } catch {
-    return { city: 'Nieznane', country: 'Nieznany', isp: 'Nieznany' };
-  }
-}
-
-// Funkcja do określania typu urządzenia
-function getDeviceType() {
-  const ua = navigator.userAgent;
-  if (/mobile/i.test(ua)) return 'Mobile';
-  if (/tablet/i.test(ua)) return 'Tablet';
-  if (/windows/i.test(ua)) return 'PC';
-  if (/mac/i.test(ua)) return 'Mac';
-  return 'Nieznane';
-}
-
-// Funkcja zapisu logów z unikaniem duplikatów
-async function saveLog() {
-  console.groupCollapsed("Zapis logu");
-  try {
-    const ip = await getIp();
-    const location = await getLocation(ip);
-    const now = new Date();
-    const timestamp = now.getTime();
-
-    // Sprawdzenie duplikatów z tego samego IP
-    const logsRef = ref(db, 'logs');
-    const recentLogsQuery = query(logsRef, orderByChild('ip'), equalTo(ip), limitToLast(1));
-    const recentLogsSnapshot = await get(recentLogsQuery);
-    const recentLogs = recentLogsSnapshot.val();
-
-    if (recentLogs) {
-      const lastLog = Object.values(recentLogs)[0];
-      const timeDiff = (timestamp - lastLog.timestamp) / 1000 / 60; // w minutach
-      if (timeDiff < 10) {
-        console.log('Log z tego IP był już zapisany w ciągu ostatnich 10 minut. Pomijanie.');
-        console.groupEnd();
-        return;
-      }
-    }
-
-    // Zapis nowego logu
-    const logData = {
-      date: now.toLocaleDateString('pl-PL'),
-      day: now.toLocaleDateString('pl-PL', { weekday: 'long' }),
-      time: now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }),
-      ip: ip,
-      location: {
-        city: location.city,
-        country: location.country
-      },
-      device: getDeviceType(),
-      isp: location.isp,
-      timestamp: timestamp
-    };
-
-    const newLogRef = push(logsRef);
-    await set(newLogRef, logData);
-    console.log('Log zapisany:', logData);
-  } catch (error) {
-    console.error('Błąd zapisu logu:', error.message);
-  }
-  console.groupEnd();
-}
-
-// Funkcja do logowania przez Google
+// Funkcja do logowania przez Google z grupowaniem logów
 async function signInWithGoogle() {
   console.groupCollapsed("Logowanie");
   try {
@@ -126,6 +41,7 @@ async function signInWithGoogle() {
     const user = result.user;
     console.log('Zalogowano przez Google:', user);
 
+    // Sprawdź, czy użytkownik ma już wybrany customUsername
     const userRef = ref(db, 'users/' + user.uid);
     const userSnapshot = await get(userRef);
     if (!userSnapshot.exists() || !userSnapshot.val().customUsername) {
@@ -163,6 +79,7 @@ function showUsernameModal(user) {
   input.value = '';
   error.style.display = 'none';
 
+  // Usuń istniejące nasłuchiwacze, aby uniknąć duplikatów
   const newSubmitButton = submitButton.cloneNode(true);
   submitButton.parentNode.replaceChild(newSubmitButton, submitButton);
 
@@ -171,6 +88,7 @@ function showUsernameModal(user) {
     console.log('Kliknięto przycisk Zatwierdź');
     const username = input.value.trim();
 
+    // Walidacja username
     if (username.length < 3) {
       console.log('Błąd walidacji: Username za krótki');
       error.textContent = 'Username musi mieć co najmniej 3 znaki.';
@@ -186,6 +104,7 @@ function showUsernameModal(user) {
       return;
     }
 
+    // Sprawdź unikalność username
     try {
       console.log('Sprawdzanie unikalności username:', username);
       const usernamesRef = ref(db, 'usernames');
@@ -210,6 +129,7 @@ function showUsernameModal(user) {
       return;
     }
 
+    // Zapisz dane użytkownika
     try {
       console.log('Zapis username dla użytkownika:', user.uid);
       const userRef = ref(db, 'users/' + user.uid);
@@ -219,8 +139,11 @@ function showUsernameModal(user) {
         lastLogin: new Date().toISOString()
       };
       await set(userRef, userData);
-      await set(ref(db, 'usernames/' + user.uid), { username: username });
       console.log('Zapisano dane użytkownika:', userData);
+
+      // Zapisz username w /usernames dla unikalności
+      await set(ref(db, 'usernames/' + user.uid), { username: username });
+      console.log('Zapisano username w /usernames');
     } catch (error) {
       console.error('Błąd podczas zapisywania username:', error.message);
       error.textContent = 'Błąd zapisu do bazy danych. Spróbuj ponownie.';
@@ -274,6 +197,7 @@ function updateLoginSection(user) {
   if (!loginDiv) return;
 
   if (user) {
+    // Pobierz customUsername z bazy danych
     const userRef = ref(db, 'users/' + user.uid);
     get(userRef).then((snapshot) => {
       if (snapshot.exists()) {
@@ -299,7 +223,7 @@ function updateLoginSection(user) {
   }
 }
 
-// Funkcja do wylogowania
+// Funkcja do wylogowania z grupowaniem logów
 function handleLogout() {
   console.groupCollapsed("Wylogowanie");
   signOut(auth)
@@ -316,7 +240,7 @@ function handleLogout() {
     });
 }
 
-// Obsługa stanu zalogowania
+// Obsługa stanu zalogowania z komunikatem wylogowania
 let wasLoggedIn = false;
 onAuthStateChanged(auth, (user) => {
   if (!user && wasLoggedIn) {
@@ -326,8 +250,7 @@ onAuthStateChanged(auth, (user) => {
   updateLoginSection(user);
 });
 
-// Inicjalizacja i zapis logu przy wejściu
+// Inicjalizacja: ustawienie początkowego stanu
 document.addEventListener('DOMContentLoaded', () => {
   updateLoginSection(auth.currentUser);
-  saveLog();
 });
